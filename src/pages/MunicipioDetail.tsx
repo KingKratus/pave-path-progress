@@ -1,8 +1,9 @@
-import { useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { MapPin, Route, Download, Loader2, AlertTriangle } from "lucide-react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { MapPin, Route, Download, Loader2, AlertTriangle, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Navbar } from "@/components/Navbar";
 import { LeafletMap } from "@/components/LeafletMap";
@@ -18,27 +19,60 @@ interface RoadData {
 
 const MunicipioDetail = () => {
   const { nome } = useParams<{ nome: string }>();
+  const [searchParams] = useSearchParams();
+  const uf = searchParams.get("uf") || undefined;
   const cityName = decodeURIComponent(nome || "");
   const [roads, setRoads] = useState<RoadData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastSync, setLastSync] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!cityName) return;
-    fetchRoads();
-  }, [cityName]);
-
-  const fetchRoads = async () => {
+  const fetchRoads = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke("overpass-proxy", {
-        body: { city: cityName },
-      });
+      // Try cached vias first
+      const { data: mun } = await supabase
+        .from("municipios")
+        .select("id, last_sync_at")
+        .eq("nome", cityName)
+        .maybeSingle();
 
+      if (mun) {
+        const { data: vias } = await supabase
+          .from("vias")
+          .select("*")
+          .eq("municipio_id", mun.id);
+        if (vias && vias.length > 0) {
+          setRoads(vias.map((v) => ({
+            id: v.id,
+            name: v.nome || "Sem nome",
+            surface: v.surface,
+            length_m: v.length_m,
+            geojson: v.geom_geojson ? JSON.parse(v.geom_geojson) : null,
+          })));
+          setLastSync(mun.last_sync_at);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Otherwise sync from Overpass
+      const { data, error: fnError } = await supabase.functions.invoke("sync-municipio", {
+        body: { municipio: cityName, uf },
+      });
       if (fnError) throw fnError;
-      if (data?.roads) {
-        setRoads(data.roads);
+
+      // Reload from DB
+      const { data: mun2 } = await supabase
+        .from("municipios").select("id, last_sync_at").eq("nome", cityName).maybeSingle();
+      if (mun2) {
+        const { data: vias } = await supabase.from("vias").select("*").eq("municipio_id", mun2.id);
+        setRoads((vias || []).map((v) => ({
+          id: v.id, name: v.nome || "Sem nome", surface: v.surface, length_m: v.length_m,
+          geojson: v.geom_geojson ? JSON.parse(v.geom_geojson) : null,
+        })));
+        setLastSync(mun2.last_sync_at);
       }
     } catch (err: any) {
       console.error("Error fetching roads:", err);
@@ -46,7 +80,13 @@ const MunicipioDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [cityName, uf]);
+
+  useEffect(() => {
+    if (cityName) fetchRoads();
+  }, [cityName, fetchRoads]);
+
+  const syncMin = lastSync ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 60000) : null;
 
   const totalKm = roads.reduce((sum, r) => sum + r.length_m, 0) / 1000;
   const surfaceBreakdown = roads.reduce((acc, r) => {
@@ -87,9 +127,17 @@ const MunicipioDetail = () => {
       <Navbar />
 
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground">{cityName}</h1>
-          <p className="text-muted-foreground">Análise de vias não pavimentadas</p>
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">{cityName}{uf && <span className="ml-2 text-xl text-muted-foreground">— {uf}</span>}</h1>
+            <p className="text-muted-foreground">Análise de vias não pavimentadas</p>
+          </div>
+          {syncMin !== null && (
+            <Badge variant="secondary" className="ml-auto gap-1">
+              <Clock className="h-3 w-3" />
+              Atualizado há {syncMin < 1 ? "menos de 1 min" : `${syncMin} min`}
+            </Badge>
+          )}
         </div>
 
         {loading ? (

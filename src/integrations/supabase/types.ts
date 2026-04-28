@@ -14,33 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_settings: {
+        Row: {
+          auto_sync_enabled: boolean
+          enabled_municipios: string[]
+          id: string
+          sync_interval_minutes: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          auto_sync_enabled?: boolean
+          enabled_municipios?: string[]
+          id?: string
+          sync_interval_minutes?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          auto_sync_enabled?: boolean
+          enabled_municipios?: string[]
+          id?: string
+          sync_interval_minutes?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       municipios: {
         Row: {
           created_at: string
           estado: string
           geom_geojson: string | null
           id: string
+          last_sync_at: string | null
           nome: string
           populacao: number | null
           regiao: string | null
+          uf: string | null
         }
         Insert: {
           created_at?: string
           estado: string
           geom_geojson?: string | null
           id?: string
+          last_sync_at?: string | null
           nome: string
           populacao?: number | null
           regiao?: string | null
+          uf?: string | null
         }
         Update: {
           created_at?: string
           estado?: string
           geom_geojson?: string | null
           id?: string
+          last_sync_at?: string | null
           nome?: string
           populacao?: number | null
           regiao?: string | null
+          uf?: string | null
         }
         Relationships: []
       }
@@ -81,6 +114,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
       }
       vias: {
         Row: {
@@ -126,15 +180,51 @@ export type Database = {
           },
         ]
       }
+      vias_snapshots: {
+        Row: {
+          created_at: string
+          data_jsonb: Json | null
+          id: string
+          municipio_id: string
+          snapshot_at: string
+          total_km_unpaved: number
+          total_vias: number
+        }
+        Insert: {
+          created_at?: string
+          data_jsonb?: Json | null
+          id?: string
+          municipio_id: string
+          snapshot_at?: string
+          total_km_unpaved?: number
+          total_vias?: number
+        }
+        Update: {
+          created_at?: string
+          data_jsonb?: Json | null
+          id?: string
+          municipio_id?: string
+          snapshot_at?: string
+          total_km_unpaved?: number
+          total_vias?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -261,6 +351,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { MapLegend } from "./MapLegend";
 
 interface Road {
   id: string;
@@ -79,5 +80,10 @@ export const LeafletMap = ({ roads, cityName }: LeafletMapProps) => {
     };
   }, [roads, cityName]);
 
-  return <div ref={mapRef} className="h-full w-full" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={mapRef} className="h-full w-full" />
+      <MapLegend />
+    </div>
+  );
 };

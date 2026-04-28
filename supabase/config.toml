@@ -2,3 +2,15 @@ project_id = "imaonsekdeanmwmhvzeh"
 
 [functions.overpass-proxy]
 verify_jwt = false
+
+[functions.sync-municipio]
+verify_jwt = false
+
+[functions.calculate-ranking]
+verify_jwt = false
+
+[functions.scheduled-sync]
+verify_jwt = false
+
+[functions.admin-trigger-sync]
+verify_jwt = true
