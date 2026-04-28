@@ -127,9 +127,17 @@ const MunicipioDetail = () => {
       <Navbar />
 
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-foreground">{cityName}</h1>
-          <p className="text-muted-foreground">Análise de vias não pavimentadas</p>
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">{cityName}{uf && <span className="ml-2 text-xl text-muted-foreground">— {uf}</span>}</h1>
+            <p className="text-muted-foreground">Análise de vias não pavimentadas</p>
+          </div>
+          {syncMin !== null && (
+            <Badge variant="secondary" className="ml-auto gap-1">
+              <Clock className="h-3 w-3" />
+              Atualizado há {syncMin < 1 ? "menos de 1 min" : `${syncMin} min`}
+            </Badge>
+          )}
         </div>
 
         {loading ? (
