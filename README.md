@@ -1,73 +1,168 @@
-# Welcome to your Lovable project
+# 🛣️ Pave Path Progress
 
-## Project info
+> Plataforma de acompanhamento e gestão de progresso de obras de pavimentação.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![TypeScript](https://img.shields.io/badge/TypeScript-96.8%25-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-Vite-61DAFB?style=flat-square&logo=react&logoColor=black)
+![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?style=flat-square&logo=supabase&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## 📋 Sobre o Projeto
 
-**Use Lovable**
+**Pave Path Progress** é uma aplicação web para monitoramento e gestão do progresso de obras viárias e de pavimentação. A plataforma permite acompanhar o avanço de trechos, registrar etapas concluídas e visualizar métricas de progresso em tempo real.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+---
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🚀 Tecnologias
 
-**Use your preferred IDE**
+| Camada | Tecnologia |
+|--------|------------|
+| Frontend | [React](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/) |
+| Build | [Vite](https://vitejs.dev/) |
+| Estilização | [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) |
+| Backend / Auth / DB | [Supabase](https://supabase.com/) |
+| Package Manager | [Bun](https://bun.sh/) |
+| Testes | [Vitest](https://vitest.dev/) |
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## ⚙️ Pré-requisitos
 
-Follow these steps:
+- [Node.js](https://nodejs.org/) v18+ **ou** [Bun](https://bun.sh/) v1+
+- Conta no [Supabase](https://supabase.com/) com projeto criado
+- Variáveis de ambiente configuradas (ver seção abaixo)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+---
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🛠️ Instalação e Execução
 
-# Step 3: Install the necessary dependencies.
-npm i
+```bash
+# 1. Clone o repositório
+git clone https://github.com/KingKratus/pave-path-progress.git
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 2. Acesse o diretório
+cd pave-path-progress
+
+# 3. Instale as dependências
+npm install
+# ou, usando Bun:
+bun install
+
+# 4. Configure as variáveis de ambiente
+cp .env.example .env
+# Edite o .env com suas credenciais do Supabase
+
+# 5. Inicie o servidor de desenvolvimento
 npm run dev
+# ou:
+bun dev
 ```
 
-**Edit a file directly in GitHub**
+A aplicação estará disponível em `http://localhost:5173`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## 🔑 Variáveis de Ambiente
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Crie um arquivo `.env` na raiz do projeto com as seguintes variáveis:
 
-## What technologies are used for this project?
+```env
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-anonima
+```
 
-This project is built with:
+> ⚠️ **Nunca** exponha sua `service_role` key no frontend.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+---
 
-## How can I deploy this project?
+## 📁 Estrutura do Projeto
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```
+pave-path-progress/
+├── public/              # Assets estáticos
+├── src/
+│   ├── components/      # Componentes reutilizáveis (shadcn/ui + customizados)
+│   ├── pages/           # Páginas da aplicação
+│   ├── hooks/           # Custom hooks
+│   ├── lib/             # Utilitários e configurações (Supabase client, etc.)
+│   └── types/           # Tipos TypeScript globais
+├── supabase/
+│   └── migrations/      # Migrations do banco de dados (PLpgSQL)
+├── .env                 # Variáveis de ambiente (não versionar)
+├── vite.config.ts       # Configuração do Vite
+├── tailwind.config.ts   # Configuração do Tailwind
+└── vitest.config.ts     # Configuração de testes
+```
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
+## 🧪 Testes
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```bash
+# Executar todos os testes
+npm run test
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+# Modo watch
+npm run test:watch
+```
+
+---
+
+## 🏗️ Build para Produção
+
+```bash
+npm run build
+```
+
+Os arquivos otimizados serão gerados na pasta `dist/`.
+
+---
+
+## ☁️ Deploy
+
+### Via Lovable
+Abra o [projeto no Lovable](https://lovable.dev) e clique em **Share → Publish**.
+
+### Manual (Vercel / Netlify)
+1. Faça o build: `npm run build`
+2. Aponte a plataforma para a pasta `dist/`
+3. Configure as variáveis de ambiente na plataforma escolhida
+
+---
+
+## 🗄️ Banco de Dados
+
+As migrations do Supabase estão em `supabase/migrations/`. Para aplicá-las:
+
+```bash
+# Instale a Supabase CLI
+npm install -g supabase
+
+# Aplique as migrations no projeto remoto
+supabase db push
+```
+
+---
+
+## 🤝 Contribuindo
+
+1. Fork o projeto
+2. Crie uma branch: `git checkout -b feature/minha-feature`
+3. Commit suas alterações: `git commit -m 'feat: adiciona minha feature'`
+4. Push para a branch: `git push origin feature/minha-feature`
+5. Abra um Pull Request
+
+---
+
+## 📄 Licença
+
+Distribuído sob a licença MIT. Veja `LICENSE` para mais informações.
+
+---
+
+## 👤 Autor
+
+**KingKratus** — [@KingKratus](https://github.com/KingKratus)
