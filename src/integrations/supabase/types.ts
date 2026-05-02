@@ -115,6 +115,59 @@ export type Database = {
           },
         ]
       }
+      sync_logs: {
+        Row: {
+          duration_ms: number | null
+          finished_at: string | null
+          id: string
+          message: string | null
+          municipio_id: string | null
+          municipio_nome: string
+          started_at: string
+          status: string
+          total_km: number | null
+          total_vias: number | null
+          triggered_by: string | null
+          uf: string | null
+        }
+        Insert: {
+          duration_ms?: number | null
+          finished_at?: string | null
+          id?: string
+          message?: string | null
+          municipio_id?: string | null
+          municipio_nome: string
+          started_at?: string
+          status: string
+          total_km?: number | null
+          total_vias?: number | null
+          triggered_by?: string | null
+          uf?: string | null
+        }
+        Update: {
+          duration_ms?: number | null
+          finished_at?: string | null
+          id?: string
+          message?: string | null
+          municipio_id?: string | null
+          municipio_nome?: string
+          started_at?: string
+          status?: string
+          total_km?: number | null
+          total_vias?: number | null
+          triggered_by?: string | null
+          uf?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_logs_municipio_id_fkey"
+            columns: ["municipio_id"]
+            isOneToOne: false
+            referencedRelation: "municipios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
