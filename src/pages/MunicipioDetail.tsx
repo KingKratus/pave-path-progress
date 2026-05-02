@@ -5,8 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Navbar } from "@/components/Navbar";
 import { LeafletMap } from "@/components/LeafletMap";
+import { PeriodComparison } from "@/components/PeriodComparison";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RoadData {
@@ -26,6 +28,7 @@ const MunicipioDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [municipioId, setMunicipioId] = useState<string | null>(null);
 
   const fetchRoads = useCallback(async () => {
     setLoading(true);
@@ -39,6 +42,7 @@ const MunicipioDetail = () => {
         .maybeSingle();
 
       if (mun) {
+        setMunicipioId(mun.id);
         const { data: vias } = await supabase
           .from("vias")
           .select("*")
@@ -67,6 +71,7 @@ const MunicipioDetail = () => {
       const { data: mun2 } = await supabase
         .from("municipios").select("id, last_sync_at").eq("nome", cityName).maybeSingle();
       if (mun2) {
+        setMunicipioId(mun2.id);
         const { data: vias } = await supabase.from("vias").select("*").eq("municipio_id", mun2.id);
         setRoads((vias || []).map((v) => ({
           id: v.id, name: v.nome || "Sem nome", surface: v.surface, length_m: v.length_m,
@@ -195,61 +200,75 @@ const MunicipioDetail = () => {
               </Card>
             </div>
 
-            {/* Map */}
-            <Card className="mb-6 overflow-hidden">
-              <div className="h-[500px]">
-                <LeafletMap roads={roads} cityName={cityName} />
-              </div>
-            </Card>
+            {/* Tabs: Mapa / Lista / Comparação */}
+            <Tabs defaultValue="mapa">
+              <TabsList>
+                <TabsTrigger value="mapa">Mapa</TabsTrigger>
+                <TabsTrigger value="lista">Lista de vias</TabsTrigger>
+                <TabsTrigger value="comparacao">Comparação de períodos</TabsTrigger>
+              </TabsList>
 
-            {/* Export + Table */}
-            <div className="mb-4 flex gap-2">
-              <Button onClick={exportGeoJSON} variant="outline" className="gap-2">
-                <Download className="h-4 w-4" /> GeoJSON
-              </Button>
-              <Button onClick={exportCSV} variant="outline" className="gap-2">
-                <Download className="h-4 w-4" /> CSV
-              </Button>
-            </div>
+              <TabsContent value="mapa">
+                <Card className="overflow-hidden">
+                  <div className="h-[500px]">
+                    <LeafletMap roads={roads} cityName={cityName} />
+                  </div>
+                </Card>
+                <div className="mt-4 flex gap-2">
+                  <Button onClick={exportGeoJSON} variant="outline" className="gap-2">
+                    <Download className="h-4 w-4" /> GeoJSON
+                  </Button>
+                  <Button onClick={exportCSV} variant="outline" className="gap-2">
+                    <Download className="h-4 w-4" /> CSV
+                  </Button>
+                </div>
+              </TabsContent>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Lista de vias</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Superfície</TableHead>
-                      <TableHead className="text-right">Comprimento</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {roads.slice(0, 100).map((road) => (
-                      <TableRow key={road.id}>
-                        <TableCell className="font-medium">{road.name || "Sem nome"}</TableCell>
-                        <TableCell>
-                          <span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
-                            {road.surface}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {road.length_m >= 1000
-                            ? `${(road.length_m / 1000).toFixed(2)} km`
-                            : `${road.length_m.toFixed(0)} m`}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {roads.length > 100 && (
-                  <p className="mt-4 text-center text-sm text-muted-foreground">
-                    Exibindo 100 de {roads.length} vias
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+              <TabsContent value="lista">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Lista de vias</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nome</TableHead>
+                          <TableHead>Superfície</TableHead>
+                          <TableHead className="text-right">Comprimento</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {roads.slice(0, 100).map((road) => (
+                          <TableRow key={road.id}>
+                            <TableCell className="font-medium">{road.name || "Sem nome"}</TableCell>
+                            <TableCell>
+                              <span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
+                                {road.surface}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {road.length_m >= 1000
+                                ? `${(road.length_m / 1000).toFixed(2)} km`
+                                : `${road.length_m.toFixed(0)} m`}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {roads.length > 100 && (
+                      <p className="mt-4 text-center text-sm text-muted-foreground">
+                        Exibindo 100 de {roads.length} vias
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="comparacao">
+                <PeriodComparison municipioId={municipioId} />
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </div>
