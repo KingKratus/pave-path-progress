@@ -47,7 +47,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${serviceKey}`,
         },
-        body: JSON.stringify({ municipio: m.nome, uf: m.uf }),
+        body: JSON.stringify({ municipio: m.nome, uf: m.uf, triggered_by: "scheduled" }),
       });
       synced.push(m.nome);
     }

@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.admin-trigger-sync]
 verify_jwt = true
+
+[functions.sync-uf]
+verify_jwt = true
+
+[functions.compare-periods]
+verify_jwt = false
