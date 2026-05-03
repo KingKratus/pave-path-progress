@@ -46,13 +46,17 @@ serve(async (req) => {
       });
     }
 
-    const { municipio, uf, recalculate } = await req.json();
+    const { municipio, uf, recalculate, parent_log_id, triggered_by } = await req.json();
 
     if (municipio) {
       const r = await fetch(`${supabaseUrl}/functions/v1/sync-municipio`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-        body: JSON.stringify({ municipio, uf }),
+        body: JSON.stringify({
+          municipio, uf,
+          parent_log_id: parent_log_id || null,
+          triggered_by: triggered_by || (parent_log_id ? `retry:${parent_log_id}` : "manual-admin"),
+        }),
       });
       const body = await r.json();
       if (!r.ok) throw new Error(body.error || "sync failed");
