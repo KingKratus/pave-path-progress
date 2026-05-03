@@ -41,6 +41,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_priorities: {
+        Row: {
+          created_at: string
+          id: string
+          model: string
+          municipio_id: string
+          payload: Json
+          provider: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model: string
+          municipio_id: string
+          payload: Json
+          provider?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string
+          municipio_id?: string
+          payload?: Json
+          provider?: string
+        }
+        Relationships: []
+      }
       municipios: {
         Row: {
           created_at: string
@@ -117,12 +144,15 @@ export type Database = {
       }
       sync_logs: {
         Row: {
+          attempt: number
           duration_ms: number | null
+          error_stage: string | null
           finished_at: string | null
           id: string
           message: string | null
           municipio_id: string | null
           municipio_nome: string
+          parent_log_id: string | null
           started_at: string
           status: string
           total_km: number | null
@@ -131,12 +161,15 @@ export type Database = {
           uf: string | null
         }
         Insert: {
+          attempt?: number
           duration_ms?: number | null
+          error_stage?: string | null
           finished_at?: string | null
           id?: string
           message?: string | null
           municipio_id?: string | null
           municipio_nome: string
+          parent_log_id?: string | null
           started_at?: string
           status: string
           total_km?: number | null
@@ -145,12 +178,15 @@ export type Database = {
           uf?: string | null
         }
         Update: {
+          attempt?: number
           duration_ms?: number | null
+          error_stage?: string | null
           finished_at?: string | null
           id?: string
           message?: string | null
           municipio_id?: string | null
           municipio_nome?: string
+          parent_log_id?: string | null
           started_at?: string
           status?: string
           total_km?: number | null
@@ -164,6 +200,13 @@ export type Database = {
             columns: ["municipio_id"]
             isOneToOne: false
             referencedRelation: "municipios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_logs_parent_log_id_fkey"
+            columns: ["parent_log_id"]
+            isOneToOne: false
+            referencedRelation: "sync_logs"
             referencedColumns: ["id"]
           },
         ]
