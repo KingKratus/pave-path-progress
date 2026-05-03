@@ -1,19 +1,23 @@
 import { useParams, useSearchParams } from "react-router-dom";
-import { useState, useEffect, useCallback } from "react";
-import { MapPin, Route, Download, Loader2, AlertTriangle, Clock } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { MapPin, Route, Download, Loader2, AlertTriangle, Clock, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Navbar } from "@/components/Navbar";
 import { LeafletMap } from "@/components/LeafletMap";
 import { PeriodComparison } from "@/components/PeriodComparison";
+import { AiPriorities } from "@/components/AiPriorities";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RoadData {
   id: string;
-  name: string;
+  osm_id: number;
+  name: string | null;
   surface: string;
   length_m: number;
   geojson: any;
@@ -29,54 +33,52 @@ const MunicipioDetail = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [municipioId, setMunicipioId] = useState<string | null>(null);
+  const [boundary, setBoundary] = useState<any>(null);
+
+  // Filtros para lista
+  const [filterSurface, setFilterSurface] = useState("all");
+  const [filterName, setFilterName] = useState("all"); // all|named|unnamed
+  const [filterMinLen, setFilterMinLen] = useState(0);
+  const [filterSearch, setFilterSearch] = useState("");
 
   const fetchRoads = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Try cached vias first
       const { data: mun } = await supabase
-        .from("municipios")
-        .select("id, last_sync_at")
-        .eq("nome", cityName)
-        .maybeSingle();
+        .from("municipios").select("id, last_sync_at, geom_geojson")
+        .eq("nome", cityName).maybeSingle();
+
+      const loadVias = async (id: string) => {
+        const { data: vias } = await supabase.from("vias").select("*").eq("municipio_id", id);
+        setRoads((vias || []).map((v: any) => ({
+          id: v.id, osm_id: v.osm_id, name: v.nome, surface: v.surface, length_m: v.length_m,
+          geojson: v.geom_geojson ? JSON.parse(v.geom_geojson) : null,
+        })));
+      };
 
       if (mun) {
         setMunicipioId(mun.id);
-        const { data: vias } = await supabase
-          .from("vias")
-          .select("*")
-          .eq("municipio_id", mun.id);
-        if (vias && vias.length > 0) {
-          setRoads(vias.map((v) => ({
-            id: v.id,
-            name: v.nome || "Sem nome",
-            surface: v.surface,
-            length_m: v.length_m,
-            geojson: v.geom_geojson ? JSON.parse(v.geom_geojson) : null,
-          })));
-          setLastSync(mun.last_sync_at);
+        if (mun.geom_geojson) try { setBoundary(JSON.parse(mun.geom_geojson)); } catch {}
+        await loadVias(mun.id);
+        setLastSync(mun.last_sync_at);
+        if ((await supabase.from("vias").select("id", { count: "exact", head: true }).eq("municipio_id", mun.id)).count) {
           setLoading(false);
           return;
         }
       }
 
-      // Otherwise sync from Overpass
-      const { data, error: fnError } = await supabase.functions.invoke("sync-municipio", {
+      const { error: fnError } = await supabase.functions.invoke("sync-municipio", {
         body: { municipio: cityName, uf },
       });
       if (fnError) throw fnError;
 
-      // Reload from DB
       const { data: mun2 } = await supabase
-        .from("municipios").select("id, last_sync_at").eq("nome", cityName).maybeSingle();
+        .from("municipios").select("id, last_sync_at, geom_geojson").eq("nome", cityName).maybeSingle();
       if (mun2) {
         setMunicipioId(mun2.id);
-        const { data: vias } = await supabase.from("vias").select("*").eq("municipio_id", mun2.id);
-        setRoads((vias || []).map((v) => ({
-          id: v.id, name: v.nome || "Sem nome", surface: v.surface, length_m: v.length_m,
-          geojson: v.geom_geojson ? JSON.parse(v.geom_geojson) : null,
-        })));
+        if (mun2.geom_geojson) try { setBoundary(JSON.parse(mun2.geom_geojson)); } catch {}
+        await loadVias(mun2.id);
         setLastSync(mun2.last_sync_at);
       }
     } catch (err: any) {
@@ -87,42 +89,47 @@ const MunicipioDetail = () => {
     }
   }, [cityName, uf]);
 
-  useEffect(() => {
-    if (cityName) fetchRoads();
-  }, [cityName, fetchRoads]);
+  useEffect(() => { if (cityName) fetchRoads(); }, [cityName, fetchRoads]);
 
   const syncMin = lastSync ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 60000) : null;
 
+  const surfaces = useMemo(() => Array.from(new Set(roads.map((r) => r.surface))), [roads]);
+
+  const filteredRoads = useMemo(() => {
+    return roads.filter((r) => {
+      if (filterSurface !== "all" && r.surface !== filterSurface) return false;
+      if (filterName === "named" && !r.name) return false;
+      if (filterName === "unnamed" && r.name) return false;
+      if (r.length_m < filterMinLen) return false;
+      if (filterSearch && !(r.name || "").toLowerCase().includes(filterSearch.toLowerCase())) return false;
+      return true;
+    });
+  }, [roads, filterSurface, filterName, filterMinLen, filterSearch]);
+
   const totalKm = roads.reduce((sum, r) => sum + r.length_m, 0) / 1000;
-  const surfaceBreakdown = roads.reduce((acc, r) => {
-    acc[r.surface] = (acc[r.surface] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
 
   const exportGeoJSON = () => {
     const fc = {
       type: "FeatureCollection",
-      features: roads.filter(r => r.geojson).map(r => ({
+      features: filteredRoads.filter(r => r.geojson).map(r => ({
         type: "Feature",
         properties: { name: r.name, surface: r.surface, length_m: r.length_m },
         geometry: r.geojson,
       })),
     };
     const blob = new Blob([JSON.stringify(fc, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
+    a.href = URL.createObjectURL(blob);
     a.download = `${cityName}_vias.geojson`;
     a.click();
   };
 
   const exportCSV = () => {
     const header = "Nome,Superfície,Comprimento (m)\n";
-    const rows = roads.map(r => `"${r.name || 'Sem nome'}","${r.surface}",${r.length_m.toFixed(1)}`).join("\n");
+    const rows = filteredRoads.map(r => `"${r.name || 'Sem nome'}","${r.surface}",${r.length_m.toFixed(1)}`).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
+    a.href = URL.createObjectURL(blob);
     a.download = `${cityName}_vias.csv`;
     a.click();
   };
@@ -130,11 +137,12 @@ const MunicipioDetail = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-
       <div className="container mx-auto px-4 py-8">
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">{cityName}{uf && <span className="ml-2 text-xl text-muted-foreground">— {uf}</span>}</h1>
+            <h1 className="text-3xl font-bold text-foreground">
+              {cityName}{uf && <span className="ml-2 text-xl text-muted-foreground">— {uf}</span>}
+            </h1>
             <p className="text-muted-foreground">Análise de vias não pavimentadas</p>
           </div>
           {syncMin !== null && (
@@ -159,77 +167,80 @@ const MunicipioDetail = () => {
           </div>
         ) : (
           <>
-            {/* Stats cards */}
             <div className="mb-6 grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardContent className="flex items-center gap-4 p-6">
-                  <div className="rounded-xl bg-destructive/10 p-3">
-                    <Route className="h-6 w-6 text-destructive" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{totalKm.toFixed(1)} km</p>
-                    <p className="text-sm text-muted-foreground">Sem pavimentação</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="flex items-center gap-4 p-6">
-                  <div className="rounded-xl bg-primary/10 p-3">
-                    <MapPin className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{roads.length}</p>
-                    <p className="text-sm text-muted-foreground">Vias analisadas</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <p className="mb-2 text-sm font-medium text-muted-foreground">Tipos de superfície</p>
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(surfaceBreakdown).map(([surface, count]) => (
-                      <span
-                        key={surface}
-                        className="rounded-full bg-accent/20 px-3 py-1 text-xs font-medium text-accent-foreground"
-                      >
-                        {surface}: {count}
-                      </span>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <Card><CardContent className="flex items-center gap-4 p-6">
+                <div className="rounded-xl bg-destructive/10 p-3"><Route className="h-6 w-6 text-destructive" /></div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{totalKm.toFixed(1)} km</p>
+                  <p className="text-sm text-muted-foreground">Sem pavimentação</p>
+                </div>
+              </CardContent></Card>
+              <Card><CardContent className="flex items-center gap-4 p-6">
+                <div className="rounded-xl bg-primary/10 p-3"><MapPin className="h-6 w-6 text-primary" /></div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{roads.length}</p>
+                  <p className="text-sm text-muted-foreground">Vias analisadas</p>
+                </div>
+              </CardContent></Card>
+              <Card><CardContent className="p-6">
+                <p className="mb-2 text-sm font-medium text-muted-foreground">Tipos de superfície</p>
+                <div className="flex flex-wrap gap-2">
+                  {surfaces.map((s) => (
+                    <span key={s} className="rounded-full bg-accent/20 px-3 py-1 text-xs font-medium text-accent-foreground">{s}</span>
+                  ))}
+                </div>
+              </CardContent></Card>
             </div>
 
-            {/* Tabs: Mapa / Lista / Comparação */}
             <Tabs defaultValue="mapa">
               <TabsList>
                 <TabsTrigger value="mapa">Mapa</TabsTrigger>
-                <TabsTrigger value="lista">Lista de vias</TabsTrigger>
-                <TabsTrigger value="comparacao">Comparação de períodos</TabsTrigger>
+                <TabsTrigger value="lista">Lista</TabsTrigger>
+                <TabsTrigger value="comparacao">Comparação</TabsTrigger>
+                <TabsTrigger value="ia"><Sparkles className="mr-1 h-3 w-3" />Prioridades IA</TabsTrigger>
               </TabsList>
 
               <TabsContent value="mapa">
                 <Card className="overflow-hidden">
                   <div className="h-[500px]">
-                    <LeafletMap roads={roads} cityName={cityName} />
+                    <LeafletMap roads={roads} cityName={cityName} boundaryGeoJson={boundary} />
                   </div>
                 </Card>
+                {!boundary && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Limite municipal não disponível ainda — sincronize novamente para restringir o mapa à cidade.
+                  </p>
+                )}
                 <div className="mt-4 flex gap-2">
-                  <Button onClick={exportGeoJSON} variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" /> GeoJSON
-                  </Button>
-                  <Button onClick={exportCSV} variant="outline" className="gap-2">
-                    <Download className="h-4 w-4" /> CSV
-                  </Button>
+                  <Button onClick={exportGeoJSON} variant="outline" className="gap-2"><Download className="h-4 w-4" /> GeoJSON</Button>
+                  <Button onClick={exportCSV} variant="outline" className="gap-2"><Download className="h-4 w-4" /> CSV</Button>
                 </div>
               </TabsContent>
 
               <TabsContent value="lista">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Lista de vias</CardTitle>
-                  </CardHeader>
+                  <CardHeader><CardTitle>Lista de vias ({filteredRoads.length})</CardTitle></CardHeader>
                   <CardContent>
+                    <div className="mb-4 grid gap-2 md:grid-cols-4">
+                      <Input placeholder="Buscar nome..." value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} />
+                      <Select value={filterSurface} onValueChange={setFilterSurface}>
+                        <SelectTrigger><SelectValue placeholder="Superfície" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas as superfícies</SelectItem>
+                          {surfaces.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={filterName} onValueChange={setFilterName}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Com e sem nome</SelectItem>
+                          <SelectItem value="named">Apenas com nome</SelectItem>
+                          <SelectItem value="unnamed">Apenas sem nome</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input type="number" placeholder="Comprimento mínimo (m)" value={filterMinLen || ""}
+                        onChange={(e) => setFilterMinLen(Number(e.target.value) || 0)} />
+                    </div>
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -239,26 +250,26 @@ const MunicipioDetail = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {roads.slice(0, 100).map((road) => (
+                        {filteredRoads.slice(0, 200).map((road) => (
                           <TableRow key={road.id}>
-                            <TableCell className="font-medium">{road.name || "Sem nome"}</TableCell>
+                            <TableCell className="font-medium">
+                              {road.name || <span className="italic text-muted-foreground">Via sem nome (#{road.osm_id})</span>}
+                            </TableCell>
                             <TableCell>
                               <span className="rounded-full bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive">
                                 {road.surface}
                               </span>
                             </TableCell>
                             <TableCell className="text-right">
-                              {road.length_m >= 1000
-                                ? `${(road.length_m / 1000).toFixed(2)} km`
-                                : `${road.length_m.toFixed(0)} m`}
+                              {road.length_m >= 1000 ? `${(road.length_m / 1000).toFixed(2)} km` : `${road.length_m.toFixed(0)} m`}
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                    {roads.length > 100 && (
+                    {filteredRoads.length > 200 && (
                       <p className="mt-4 text-center text-sm text-muted-foreground">
-                        Exibindo 100 de {roads.length} vias
+                        Exibindo 200 de {filteredRoads.length} vias filtradas
                       </p>
                     )}
                   </CardContent>
@@ -267,6 +278,10 @@ const MunicipioDetail = () => {
 
               <TabsContent value="comparacao">
                 <PeriodComparison municipioId={municipioId} />
+              </TabsContent>
+
+              <TabsContent value="ia">
+                <AiPriorities municipioId={municipioId} />
               </TabsContent>
             </Tabs>
           </>
