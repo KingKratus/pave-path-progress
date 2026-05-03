@@ -37,7 +37,6 @@ serve(async (req) => {
       });
     }
 
-    // Pick snapshots closest to from/to (or first/last)
     const pickClosest = (target?: string | null) => {
       if (!target) return null;
       const t = new Date(target).getTime();
@@ -53,7 +52,6 @@ serve(async (req) => {
     const km_paved_added = Math.max(0, fromSnap.total_km_unpaved - toSnap.total_km_unpaved);
     const vias_diff = (fromSnap.total_vias || 0) - (toSnap.total_vias || 0);
 
-    // Per-surface diff
     const fromBy = (fromSnap.data_jsonb?.by_surface_m || {}) as Record<string, number>;
     const toBy = (toSnap.data_jsonb?.by_surface_m || {}) as Record<string, number>;
     const surfaces = new Set([...Object.keys(fromBy), ...Object.keys(toBy)]);
@@ -65,15 +63,31 @@ serve(async (req) => {
     }
     by_surface_diff.sort((a, b) => Math.abs(b.diff_m) - Math.abs(a.diff_m));
 
+    // Roads changed (from data_jsonb.vias if available)
+    const fromVias = ((fromSnap.data_jsonb?.vias || []) as any[]);
+    const toVias = ((toSnap.data_jsonb?.vias || []) as any[]);
+    const fromMap = new Map(fromVias.map((v) => [v.osm_id, v]));
+    const toMap = new Map(toVias.map((v) => [v.osm_id, v]));
+    const paved: any[] = [];        // existed in from, gone in to
+    const new_unpaved: any[] = [];  // new in to
+    const surface_changed: any[] = [];
+    for (const [id, v] of fromMap) {
+      if (!toMap.has(id)) paved.push(v);
+      else {
+        const t = toMap.get(id)!;
+        if (t.surface !== v.surface) surface_changed.push({ ...t, from_surface: v.surface });
+      }
+    }
+    for (const [id, v] of toMap) if (!fromMap.has(id)) new_unpaved.push(v);
+
     return new Response(
       JSON.stringify({
         snapshots: snaps.map((s) => ({ id: s.id, snapshot_at: s.snapshot_at, total_km_unpaved: s.total_km_unpaved, total_vias: s.total_vias })),
         comparison: {
           from: { snapshot_at: fromSnap.snapshot_at, total_km_unpaved: fromSnap.total_km_unpaved, total_vias: fromSnap.total_vias },
           to: { snapshot_at: toSnap.snapshot_at, total_km_unpaved: toSnap.total_km_unpaved, total_vias: toSnap.total_vias },
-          km_paved_added,
-          vias_diff,
-          by_surface_diff,
+          km_paved_added, vias_diff, by_surface_diff,
+          roads_changed: { paved, new_unpaved, surface_changed },
         },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
