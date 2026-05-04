@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, RefreshCw, Calculator, MapIcon, AlertCircle, CheckCircle2, RotateCcw, Eye } from "lucide-react";
+import { AiProvidersPanel } from "@/components/admin/AiProvidersPanel";
 import { toast } from "@/hooks/use-toast";
 
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
@@ -383,6 +384,9 @@ const Admin = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="ia">
+            <AiProvidersPanel />
+          </TabsContent>
           <TabsContent value="ranking">
             <Card>
               <CardHeader><CardTitle>Recalcular ranking</CardTitle></CardHeader>
