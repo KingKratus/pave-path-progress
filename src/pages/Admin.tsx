@@ -197,12 +197,13 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="sync">
-          <TabsList>
+          <TabsList className="overflow-x-auto">
             <TabsTrigger value="sync">Sincronização</TabsTrigger>
             <TabsTrigger value="municipios">Municípios</TabsTrigger>
             <TabsTrigger value="uf">Sync por UF</TabsTrigger>
             <TabsTrigger value="logs">Histórico</TabsTrigger>
             <TabsTrigger value="ranking">Ranking</TabsTrigger>
+            <TabsTrigger value="ia">IA Providers</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sync">
