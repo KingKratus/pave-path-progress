@@ -1,32 +1,53 @@
 import { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowDown, ArrowUp, Loader2, Minus } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Minus, X } from "lucide-react";
+import { VirtualRoadList } from "./VirtualRoadList";
 
 interface Snapshot { id: string; snapshot_at: string; total_km_unpaved: number; total_vias: number; }
-interface ViaItem { osm_id: number; nome: string | null; surface: string; length_m: number; from_surface?: string; }
+interface ViaItem { osm_id: number; nome: string | null; surface: string; length_m: number; from_surface?: string; bairro?: string | null; }
 interface Comparison {
   from: { snapshot_at: string; total_km_unpaved: number; total_vias: number };
   to: { snapshot_at: string; total_km_unpaved: number; total_vias: number };
   km_paved_added: number;
   vias_diff: number;
   by_surface_diff: { surface: string; from_m: number; to_m: number; diff_m: number }[];
+  counts?: { paved: number; new_unpaved: number; surface_changed: number };
   roads_changed?: { paved: ViaItem[]; new_unpaved: ViaItem[]; surface_changed: ViaItem[] };
 }
 
-export function PeriodComparison({ municipioId }: { municipioId: string | null }) {
+const STORAGE_KEY = "comparison_filters";
+
+export function PeriodComparison({ municipioId, onSelectRoad }: { municipioId: string | null; onSelectRoad?: (osmId: number) => void }) {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [comparison, setComparison] = useState<Comparison | null>(null);
-  const [fromId, setFromId] = useState<string>("");
-  const [toId, setToId] = useState<string>("");
+  const [fromId, setFromId] = useState("");
+  const [toId, setToId] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [filterSurface, setFilterSurface] = useState("all");
-  const [search, setSearch] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const persisted = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; } })();
+
+  const [filterSurface, setFilterSurface] = useState<string>(searchParams.get("surface") || persisted.surface || "all");
+  const [search, setSearch] = useState<string>(searchParams.get("q") || persisted.q || "");
+  const [minLen, setMinLen] = useState<number>(Number(searchParams.get("min") || persisted.min || 0));
+  const [sort, setSort] = useState<string>(searchParams.get("sort") || persisted.sort || "len_desc");
+
+  useEffect(() => {
+    const f = { surface: filterSurface, q: search, min: minLen, sort };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(f));
+    const p = new URLSearchParams(searchParams);
+    if (filterSurface !== "all") p.set("surface", filterSurface); else p.delete("surface");
+    if (search) p.set("q", search); else p.delete("q");
+    if (minLen) p.set("min", String(minLen)); else p.delete("min");
+    if (sort !== "len_desc") p.set("sort", sort); else p.delete("sort");
+    setSearchParams(p, { replace: true });
+  }, [filterSurface, search, minLen, sort]);
 
   const fetchData = async (from?: string, to?: string) => {
     if (!municipioId) return;
@@ -34,6 +55,9 @@ export function PeriodComparison({ municipioId }: { municipioId: string | null }
     const params = new URLSearchParams({ municipio_id: municipioId });
     if (from) params.set("from", from);
     if (to) params.set("to", to);
+    if (filterSurface !== "all") params.set("surface", filterSurface);
+    if (search) params.set("q", search);
+    if (minLen) params.set("min_len_m", String(minLen));
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/compare-periods?${params}`;
     try {
       const data = await fetch(url, { headers: { apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } }).then((r) => r.json());
@@ -54,19 +78,25 @@ export function PeriodComparison({ municipioId }: { municipioId: string | null }
 
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 
-  const filterList = (list: ViaItem[] = []) => list.filter((v) => {
-    if (filterSurface !== "all" && v.surface !== filterSurface) return false;
-    if (search && !(v.nome || "").toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
-
   const allSurfaces = useMemo(() => {
     const s = new Set<string>();
-    comparison?.roads_changed?.paved.forEach((v) => s.add(v.surface));
-    comparison?.roads_changed?.new_unpaved.forEach((v) => s.add(v.surface));
-    comparison?.roads_changed?.surface_changed.forEach((v) => s.add(v.surface));
+    comparison?.by_surface_diff.forEach((d) => s.add(d.surface));
     return Array.from(s);
   }, [comparison]);
+
+  const sortFn = (a: ViaItem, b: ViaItem) => {
+    if (sort === "len_asc") return (a.length_m || 0) - (b.length_m || 0);
+    if (sort === "name") return (a.nome || "").localeCompare(b.nome || "");
+    return (b.length_m || 0) - (a.length_m || 0);
+  };
+
+  const lists = useMemo(() => ({
+    paved: [...(comparison?.roads_changed?.paved || [])].sort(sortFn),
+    new_unpaved: [...(comparison?.roads_changed?.new_unpaved || [])].sort(sortFn),
+    surface_changed: [...(comparison?.roads_changed?.surface_changed || [])].sort(sortFn),
+  }), [comparison, sort]);
+
+  const clearFilters = () => { setFilterSurface("all"); setSearch(""); setMinLen(0); setSort("len_desc"); };
 
   if (!municipioId) return null;
   if (loading && !comparison) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
@@ -109,17 +139,39 @@ export function PeriodComparison({ municipioId }: { municipioId: string | null }
               <Stat label="Total atual" value={`${comparison.to.total_km_unpaved.toFixed(2)} km`} neutral />
             </div>
 
+            <div className="sticky top-0 z-10 -mx-2 grid gap-2 rounded-md border border-border bg-card/95 px-2 py-2 backdrop-blur md:grid-cols-5">
+              <Input placeholder="Buscar por nome..." value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Select value={filterSurface} onValueChange={setFilterSurface}>
+                <SelectTrigger><SelectValue placeholder="Superfície" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as superfícies</SelectItem>
+                  {allSurfaces.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Input type="number" placeholder="Comp. mín. (m)" value={minLen || ""} onChange={(e) => setMinLen(Number(e.target.value) || 0)} />
+              <Select value={sort} onValueChange={setSort}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="len_desc">Maior comprimento</SelectItem>
+                  <SelectItem value="len_asc">Menor comprimento</SelectItem>
+                  <SelectItem value="name">Nome (A-Z)</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="ghost" onClick={clearFilters} className="gap-1"><X className="h-3 w-3" />Limpar</Button>
+            </div>
+            <Button size="sm" variant="outline" onClick={recompute} disabled={loading}>Aplicar filtros no servidor</Button>
+
             <Tabs defaultValue="surface">
-              <TabsList>
+              <TabsList className="overflow-x-auto">
                 <TabsTrigger value="surface">Por superfície</TabsTrigger>
-                <TabsTrigger value="paved">Pavimentadas ({comparison.roads_changed?.paved.length || 0})</TabsTrigger>
-                <TabsTrigger value="new">Novas ({comparison.roads_changed?.new_unpaved.length || 0})</TabsTrigger>
-                <TabsTrigger value="changed">Mudaram ({comparison.roads_changed?.surface_changed.length || 0})</TabsTrigger>
+                <TabsTrigger value="paved">Pavimentadas ({lists.paved.length})</TabsTrigger>
+                <TabsTrigger value="new">Novas ({lists.new_unpaved.length})</TabsTrigger>
+                <TabsTrigger value="changed">Mudaram ({lists.surface_changed.length})</TabsTrigger>
               </TabsList>
 
               <TabsContent value="surface">
                 <div className="space-y-1 pt-2">
-                  {comparison.by_surface_diff.slice(0, 12).map((s) => {
+                  {comparison.by_surface_diff.slice(0, 20).map((s) => {
                     const diffKm = s.diff_m / 1000;
                     return (
                       <div key={s.surface} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
@@ -134,37 +186,9 @@ export function PeriodComparison({ municipioId }: { municipioId: string | null }
                 </div>
               </TabsContent>
 
-              {(["paved", "new", "changed"] as const).map((key) => {
-                const list = comparison.roads_changed?.[key === "paved" ? "paved" : key === "new" ? "new_unpaved" : "surface_changed"] || [];
-                const filtered = filterList(list);
-                return (
-                  <TabsContent key={key} value={key}>
-                    <div className="mb-3 grid gap-2 md:grid-cols-2">
-                      <Input placeholder="Buscar nome..." value={search} onChange={(e) => setSearch(e.target.value)} />
-                      <Select value={filterSurface} onValueChange={setFilterSurface}>
-                        <SelectTrigger><SelectValue placeholder="Superfície" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todas</SelectItem>
-                          {allSurfaces.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1 max-h-96 overflow-y-auto">
-                      {filtered.length === 0 && <p className="py-4 text-center text-sm text-muted-foreground">Nenhuma rua nesta categoria</p>}
-                      {filtered.slice(0, 200).map((v) => (
-                        <div key={v.osm_id} className="flex items-center justify-between rounded border border-border px-3 py-2 text-sm">
-                          <span className="font-medium">{v.nome || <span className="italic text-muted-foreground">Via #{v.osm_id}</span>}</span>
-                          <div className="flex items-center gap-2">
-                            {v.from_surface && <Badge variant="outline" className="text-xs">{v.from_surface} → {v.surface}</Badge>}
-                            {!v.from_surface && <Badge variant="secondary" className="text-xs">{v.surface}</Badge>}
-                            <span className="text-xs text-muted-foreground">{(v.length_m / 1000).toFixed(2)} km</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </TabsContent>
-                );
-              })}
+              <TabsContent value="paved"><VirtualRoadList items={lists.paved} onClick={(it) => onSelectRoad?.(it.osm_id)} /></TabsContent>
+              <TabsContent value="new"><VirtualRoadList items={lists.new_unpaved} onClick={(it) => onSelectRoad?.(it.osm_id)} /></TabsContent>
+              <TabsContent value="changed"><VirtualRoadList items={lists.surface_changed} onClick={(it) => onSelectRoad?.(it.osm_id)} /></TabsContent>
             </Tabs>
           </>
         )}

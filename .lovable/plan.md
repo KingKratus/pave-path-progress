@@ -1,144 +1,128 @@
-# Expansão completa — Ranking de Pavimentação
+# Plano — Refresh UX + IA configurável + Busca global + Comparação interativa
 
-Plano consolidado cobrindo todas as solicitações: promoção de admin, melhorias na comparação, retry e observabilidade no admin, progresso em tempo real, filtros, IA personalizada para priorização, mapa restrito à cidade, correção de bugs de navegação e refatoração visual do front-end.
+## Visão geral
 
----
-
-## 1. Promover gazetalibertaria51@gmail.com como admin
-
-- Insert direto em `user_roles` selecionando `id` de `auth.users` pelo e-mail (apenas se a conta já existir).
-- Caso o e-mail ainda não tenha conta cadastrada: instruir o usuário a criar em `/auth` e então rodar a promoção (ou criar uma edge function `bootstrap-admin` protegida por código secreto, executada uma vez).
-
-## 2. Aba "Comparação" do município — versão avançada
-
-Expandir `PeriodComparison.tsx` e `compare-periods` edge function:
-
-- **Lista de ruas alteradas** entre dois snapshots:
-  - Pavimentadas (existiam como unpaved no "from", sumiram no "to")
-  - Novas vias não pavimentadas (apareceram no "to")
-  - Mudança de superfície (ex.: dirt → gravel)
-- **Filtros**: por tipo de superfície (dirt, gravel, earth, ground, compacted, sand, mud), por presença de nome, por comprimento mínimo (m).
-- **Busca por nome** da rua.
-- **Mini-mapa** opcional destacando as ruas alteradas (ícone de "ver no mapa").
-- Edge function passa a retornar `roads_changed: { paved: [...], new_unpaved: [...], surface_changed: [...] }` além dos agregados atuais.
-
-## 3. Admin — Retry de sincronização que falhou
-
-- Botão **"Tentar novamente"** em cada linha do histórico com `status='error'`.
-- Chama `admin-trigger-sync` com `municipio`, `uf` e `triggered_by='retry:<log_id>'`.
-- Nova coluna `parent_log_id` em `sync_logs` para encadear tentativas (migração).
-- UI mostra badge "Tentativa #N" agrupando logs pelo `parent_log_id`.
-
-## 4. Sync por UF — progresso em tempo real
-
-- Substituir polling fixo por **Supabase Realtime** em `sync_logs` filtrando por `triggered_by like 'uf-batch:<id>%'`.
-- Habilitar realtime: `ALTER PUBLICATION supabase_realtime ADD TABLE public.sync_logs;` e `REPLICA IDENTITY FULL`.
-- Calcular e exibir:
-  - **Taxa**: municípios/min (média móvel dos últimos 5).
-  - **ETA**: `(restantes / taxa)` formatado em min/seg.
-  - **Sucesso vs erro** (contadores ao vivo).
-- Fallback de polling a cada 5s caso o canal realtime caia.
-
-## 5. Histórico de sync — detalhamento por etapa
-
-- Nova coluna `error_stage` em `sync_logs`: `overpass | ingest | calc | unknown`.
-- Edge function `sync-municipio` marca o estágio onde falhou (try/catch por bloco).
-- UI no admin:
-  - Agrupamento por município mostrando todas as tentativas (`parent_log_id`).
-  - Contadores de erro por etapa (Overpass / Ingestão / Cálculo).
-  - Botão "Ver erro completo" abrindo Dialog com `message` integral + `duration_ms` + `triggered_by`.
-
-## 6. Filtros de busca (município, ranking, vias)
-
-- **Home `/`**: autocomplete IBGE já existe — adicionar filtros por UF e por "somente municípios já sincronizados".
-- **Ranking `/ranking`**: filtros por UF, faixa de população, intervalo de score, ordenar por score / km pavimentados / km não pavimentados.
-- **Detalhe do município → aba Lista**: filtros por superfície, comprimento mínimo, "com nome" / "sem nome", busca textual.
-
-## 7. Mapa restrito à cidade + estilos alternativos
-
-- `sync-municipio` passa a buscar e armazenar a **geometria do limite municipal** (`relation["boundary"="administrative"]["admin_level"~"7|8"]["name"="X"]`) em `municipios.geom_geojson`.
-- `LeafletMap` recebe `boundaryGeoJson` e:
-  - Aplica `map.fitBounds(boundary)` e desenha o polígono em destaque.
-  - Adiciona uma máscara escura (polígono inverso) para esmaecer o que está fora da cidade.
-  - Faz `setMaxBounds` para impedir scroll/zoom para fora.
-- **Seletor de estilo de mapa** (controle no canto): OSM padrão (atual) | Carto Light | Carto Dark | Esri Satellite | OpenTopoMap. Persistido em `localStorage`.
-
-## 8. Resolver "ruas sem nome" e evitar geometrias erradas
-
-Estratégias combinadas:
-
-- **Nome via tags alternativas**: se `tags.name` ausente, tentar `tags["name:pt"]`, `tags.ref`, `tags.alt_name`, `tags.loc_name`. Caso contrário marcar `nome=null` mas exibir como "Via sem nome (ID OSM)".
-- **Filtragem geográfica**: descartar ways cujo centróide esteja fora do `boundary` da cidade (point-in-polygon usando `@turf/boolean-point-in-polygon`).
-- **Reverse geocoding opcional**: edge function `enrich-vias` chama Nominatim apenas para vias sem nome, em batch limitado (rate-limit 1 req/s), e preenche um nome aproximado tipo "Próximo a Rua X". Acionado manualmente pelo admin para evitar abuso.
-- **Filtro highway**: excluir `highway in (footway, path, cycleway, track service para fazendas)` que costumam aparecer fora de áreas urbanas — manter apenas `residential, unclassified, tertiary, secondary, primary, living_street`.
-
-## 9. Integração com IA personalizada (Gemini / OpenRouter / OpenAI) — Áreas prioritárias
-
-- **Lovable AI por padrão** (sem chave do usuário). Modelos disponíveis no gateway: `google/gemini-3-flash-preview` (default), `openai/gpt-5`, etc.
-- **BYOK opcional** ("Use minha chave"): tela em `/admin → IA` para colar chave própria de Gemini, OpenRouter ou OpenAI; armazenada apenas como Supabase secret nominal (`USER_GEMINI_KEY`, `USER_OPENROUTER_KEY`, `USER_OPENAI_KEY`) via `add_secret`.
-- Edge function `ai-prioritize`:
-  - Recebe `municipio_id`.
-  - Monta payload com agregados (km por superfície, top 50 vias por comprimento, densidade por bairro/quadrante).
-  - Pede ao modelo um JSON estruturado (tool calling) com `priorities: [{ area, score, justificativa, vias_ids }]`.
-  - Salva resultado em nova tabela `ai_priorities` (cacheado por município + modelo + data).
-- UI no município: nova aba **"Prioridades (IA)"** com cards rankeados, justificativa em PT-BR, e destaque dessas vias no mapa.
-
-## 10. Bug fix — abas não aparecem (Mapa/Lista/Comparação e abas do Admin)
-
-Investigar e corrigir:
-
-- Verificar overflow horizontal em mobile (375px) — `TabsList` provavelmente está estourando. Aplicar `overflow-x-auto` + `flex-nowrap` + ScrollArea, ou trocar para `Select` em telas `<sm`.
-- Garantir que `MunicipioDetail` renderize `<Tabs>` mesmo quando `roads.length === 0` (atualmente pode estar condicionado).
-- Admin: confirmar que `useUserRole` resolveu antes de renderizar tabs (loading state explícito).
-- Confirmar registro das rotas `/admin` e `/auth` no `App.tsx`.
-
-## 11. Refatoração de front-end + correção de bugs gerais
-
-- Padronizar layout com container responsivo, espaçamentos consistentes (Tailwind tokens já no `index.css`).
-- Componentes reutilizáveis: `PageHeader`, `StatCard`, `EmptyState`, `LoadingState`, `ErrorState`.
-- Home: hero mais limpo, busca destacada, cards de "Cidades em destaque" puxando do ranking.
-- Ranking: tabela com sticky header, badges de variação (▲▼).
-- Município: header com nome/UF/última sync, KPIs, tabs em ScrollArea.
-- Admin: sidebar lateral em desktop, tabs em mobile.
-- Toasts consistentes em todas as ações (sucesso/erro).
-- Tema civic (verde/amarelo) preservado, melhor contraste, modo claro como padrão.
+Reformular o visual (mantendo identidade cívica BR), permitir configurar provedores de IA no admin, escalar a aba de Comparação para milhares de ruas com paginação/virtualização e filtros persistentes, integrar destaque de via no mapa ao clicar, criar página de busca global (cidades/ruas/bairros) e adicionar painel de insights por município. Também melhorar a qualidade dos dados (nomes de ruas e coordenadas precisas).
 
 ---
 
-## Detalhes técnicos (resumo)
+## 1. Refresh de UX e estilo
 
-**Migrações SQL**
-- `ALTER TABLE sync_logs ADD COLUMN parent_log_id uuid, ADD COLUMN error_stage text;`
-- `CREATE TABLE ai_priorities (id, municipio_id, model, created_at, payload jsonb);` + RLS leitura pública.
-- `ALTER PUBLICATION supabase_realtime ADD TABLE public.sync_logs;` + `ALTER TABLE sync_logs REPLICA IDENTITY FULL;`
-- Insert do admin via `auth.users` lookup.
+- **Design tokens (`src/index.css` + `tailwind.config.ts`)**: paleta cívica refinada (verde #0F7A3C, amarelo #F2C200, azul institucional #143A7B), tipografia Inter + Space Grotesk para títulos, raio `--radius: 0.75rem`, sombra suave reutilizável.
+- **Componentes base**:
+  - `PageHeader` (título + breadcrumb + ações) usado em Index, Ranking, Município, Admin, Busca.
+  - `StatCard` padronizado (ícone + valor + delta).
+  - `EmptyState`, `SectionTitle`, `Chip` (badge clicável para filtros).
+  - Atualizar `Navbar` com layout sticky, busca rápida embutida e indicador de ambiente (admin).
+- **Index**: hero mais limpo, cards de cidades em destaque, atalho "Buscar tudo" → `/buscar`.
+- **MunicipioDetail**: tabs com ícones, header com gradiente sutil + status de última sync + botão de exportar.
+- **Admin**: sidebar vertical (em vez de tabs horizontais lotadas) com seções: Sincronização, Municípios, Sync por UF, Histórico, Ranking, **IA Providers** (nova).
+- **Mobile**: revisão de breakpoints (375px alvo do viewport atual), tabs com scroll horizontal já existente; ajustar padding e tamanhos.
 
-**Edge functions novas/atualizadas**
-- `sync-municipio` — try/catch por estágio, captura boundary, filtra ways fora.
-- `compare-periods` — retorna ruas alteradas com classificação.
-- `ai-prioritize` — Lovable AI Gateway por padrão, BYOK opcional.
-- `enrich-vias` — Nominatim opcional para nomear ruas.
+## 2. Tela de IA Providers no admin
 
-**Frontend**
-- `PeriodComparison` reescrito com filtros e lista de ruas.
-- `LeafletMap` com boundary + mask + seletor de estilo.
-- `Admin` com retry, realtime, agrupamento por tentativa.
-- Refatoração visual geral.
+- Nova aba `/admin` → "IA Providers".
+- Form para escolher provider padrão (Lovable / Gemini / OpenAI / OpenRouter), modelo, e inserir API key.
+- **Armazenamento**: tabela `ai_provider_settings` (singleton via `id = 'default'`):
+  - `provider text`, `model text`, `updated_by uuid`, `updated_at timestamptz`.
+  - Chaves vão como **secrets** do projeto (`USER_GEMINI_KEY`, `USER_OPENAI_KEY`, `USER_OPENROUTER_KEY`) — usar `add_secret`. Tabela apenas registra qual está ativo + modelo.
+- Botão "Validar conexão" → chama edge function `ai-validate` que faz uma chamada teste e devolve ok/erro.
+- `AiPriorities.tsx` passa a ler o provider padrão (via select que vem pré-preenchido pela tabela). Usuário pode sobrescrever na hora se for admin.
+- RLS: SELECT público do registro (sem expor chaves), INSERT/UPDATE só admin.
 
-**Stack adicional**
-- `@turf/boolean-point-in-polygon` para filtragem geográfica.
-- Supabase Realtime no front (`supabase.channel`).
+## 3. Lista de ruas alteradas — paginação, virtualização, filtros persistentes
+
+Em `PeriodComparison.tsx`:
+
+- Adicionar `**@tanstack/react-virtual**` (`bun add @tanstack/react-virtual`) para virtualizar listas longas dentro de cada tab (paved/new/changed).
+- Paginação server-side opcional via `compare-periods` (params `page`, `page_size`, `surface`, `q`, `min_len_m`); por padrão devolve até 5.000 itens, mas com filtros server-side aplicados.
+- **Filtros persistentes** via URL params (`useSearchParams`) + `localStorage`:
+  - superfície (multi-select), busca textual, comprimento mínimo, "somente com nome".
+- Ordenação: por comprimento desc, alfabética, por mudança de superfície.
+- Toolbar sticky no topo da lista com contadores e botão "limpar filtros".
+
+## 4. Destaque de via no mapa ao clicar
+
+- `MunicipioDetail` mantém estado `highlightedOsmId` + `focusedGeometry`.
+- Ao clicar numa rua na aba Comparação (ou na lista do mapa), setar esse estado e:
+  - Trocar para a aba "Mapa".
+  - Em `LeafletMap`, novo prop `focusOsmId` → encontrar a feature, abrir popup, `map.fitBounds(layer.getBounds(), { maxZoom: 18, padding: [40,40] })`, e estilo realçado (peso 6, cor `--accent`, glow via `className`).
+- Já existe `highlightOsmIds: Set<number>`; estendemos para também aceitar foco com animação (`flyToBounds`).
+
+## 5. Qualidade dos dados (nomes e coordenadas)
+
+Edge function `enrich-vias` (nova) + ajustes no `sync-municipio`:
+
+- **Coordenadas precisas**: já usamos `out geom;` do Overpass (geometria real da via). Garantir que cada via salve o `geom_geojson` LineString com os nós reais; calcular um `centroid_lat/lng` (ponto médio do LineString) e persistir nas colunas novas `centroid_lat double precision`, `centroid_lng double precision` em `vias`. Isso elimina coordenadas "aleatórias".
+- **Nomes ausentes**: pipeline em camadas:
+  1. Tags OSM: `name`, `name:pt`, `alt_name`, `official_name`, `loc_name`, `ref`, `addr:street`.
+  2. Se ainda vazio, query Overpass por `way(around:25, lat, lng)[highway][name]` no centroid → herda nome de via contígua mesma direção.
+  3. Reverse geocoding com **Nominatim** (`https://nominatim.openstreetmap.org/reverse`) com User-Agent próprio e rate-limit 1 req/s, lendo `address.road`.
+  4. Como último recurso, marcar `nome_status = 'sem_nome'` (nova coluna) — UI mostra "Via sem nome (próxima a X)" usando bairro.
+- Botão no admin "Enriquecer nomes" por município (dispara `enrich-vias`).
+
+Migração:
+
+```sql
+alter table vias add column if not exists centroid_lat double precision;
+alter table vias add column if not exists centroid_lng double precision;
+alter table vias add column if not exists nome_status text default 'ok';
+alter table vias add column if not exists bairro text;
+create index if not exists vias_municipio_surface_idx on vias(municipio_id, surface);
+create index if not exists vias_nome_trgm_idx on vias using gin (nome gin_trgm_ops);
+create extension if not exists pg_trgm;
+```
+
+## 6. Página de busca global `/buscar`
+
+- Rota nova `src/pages/Buscar.tsx`.
+- Campo único + filtros: tipo (cidade / rua / bairro), UF, superfície, "somente sem nome".
+- Busca com debounce 300ms; usa Supabase:
+  - cidades: `municipios` (`ilike`).
+  - ruas: `vias` (`ilike` sobre `nome`, com trigram).
+  - bairros: `vias.bairro` distinct.
+- Resultado em tabs ou seções com chips e atalhos:
+  - cidade → `/municipio/:nome`
+  - rua → `/municipio/:nome?focus=<osm_id>` (abre mapa focado).
+- Atalho `Ctrl/Cmd+K` na Navbar abre um Command (`cmdk`) com busca rápida.
+
+## 7. Insights por município
+
+- Nova seção (tab "Insights") em `MunicipioDetail`:
+  - **Cards automáticos** (sem IA): top 5 ruas mais longas sem pavimentação, % de vias sem nome, distribuição por superfície (bar chart com `recharts`), evolução do score (linha — usando `ranking` por período).
+  - **Insights IA**: reaproveita `ai-prioritize` mas com prompt expandido para gerar bullet points de oportunidades (ex.: "Bairro X concentra 32% das vias dirt"). Guardar em `ai_priorities.payload.insights`.
+- Botão "Gerar insights" usa o provider padrão configurado no admin.
 
 ---
 
-## Ordem de implementação
+## Backend / migrações resumidas
 
-1. Migrações + promoção de admin
-2. Bug de navegação (abas) — desbloqueia teste
-3. Mapa restrito à cidade + estilos
-4. Filtros (home, ranking, lista)
-5. Comparação avançada com lista de ruas + filtros
-6. Retry + estágios de erro + realtime no admin
-7. Resolução de ruas sem nome + filtragem geográfica
-8. Integração IA (Lovable AI default + BYOK)
-9. Refatoração visual final + QA
+1. `ai_provider_settings` (singleton) + RLS.
+2. `vias`: colunas `centroid_lat`, `centroid_lng`, `nome_status`, `bairro` + índices + extensão `pg_trgm`.
+3. Novas edge functions:
+  - `ai-validate` — testa chave do provider.
+  - `enrich-vias` — recalcula nomes/centroides para um município.
+4. `compare-periods` — aceita filtros e paginação server-side.
+5. `sync-municipio` — passa a popular centroid + bairro (via tag `addr:suburb` quando disponível).
+
+## Frontend resumido
+
+- Novos arquivos: `src/components/PageHeader.tsx`, `StatCard.tsx`, `EmptyState.tsx`, `CommandPalette.tsx`, `pages/Buscar.tsx`, `components/MunicipioInsights.tsx`, `components/admin/AiProvidersPanel.tsx`, `components/VirtualRoadList.tsx`.
+- Editados: `index.css`, `tailwind.config.ts`, `Navbar.tsx`, `Index.tsx`, `Ranking.tsx`, `MunicipioDetail.tsx`, `PeriodComparison.tsx`, `LeafletMap.tsx`, `Admin.tsx`, `AiPriorities.tsx`, `App.tsx` (rota `/buscar`).
+
+## Dependências
+
+- `@tanstack/react-virtual`
+- `cmdk` (provavelmente já presente via shadcn `command`)
+- `recharts` (se ainda não instalado)
+
+## Critérios de aceite
+
+- Aba Comparação rola fluido com 10k+ itens; filtros persistem ao recarregar.
+- Clicar numa rua leva ao mapa com a via destacada e zoom no trecho exato.
+- Admin → IA Providers permite trocar provider padrão e validar a chave; AiPriorities respeita o padrão.
+- Página `/buscar` retorna cidades, ruas e bairros em <500ms para termos comuns.
+- Vias sem nome caem para <10% após `enrich-vias` em Duque de Caxias; nenhuma via aparece com coordenadas fora do polígono.
+- Visual atualizado consistente em mobile (375px) e desktop.
+- Corrija bugs e verifique se os dados são reais ou fictícios
+- Crie uma opção com mapa em SVG (ACHE UMA BIBLIOTECA DISSO) 

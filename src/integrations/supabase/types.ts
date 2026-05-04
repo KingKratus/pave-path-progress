@@ -68,6 +68,30 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_provider_settings: {
+        Row: {
+          id: string
+          model: string
+          provider: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          model?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          model?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       municipios: {
         Row: {
           created_at: string
@@ -234,34 +258,46 @@ export type Database = {
       }
       vias: {
         Row: {
+          bairro: string | null
+          centroid_lat: number | null
+          centroid_lng: number | null
           created_at: string
           geom_geojson: string | null
           id: string
           length_m: number
           municipio_id: string
           nome: string | null
+          nome_status: string
           osm_id: number
           snapshot_date: string
           surface: string
         }
         Insert: {
+          bairro?: string | null
+          centroid_lat?: number | null
+          centroid_lng?: number | null
           created_at?: string
           geom_geojson?: string | null
           id?: string
           length_m?: number
           municipio_id: string
           nome?: string | null
+          nome_status?: string
           osm_id: number
           snapshot_date?: string
           surface: string
         }
         Update: {
+          bairro?: string | null
+          centroid_lat?: number | null
+          centroid_lng?: number | null
           created_at?: string
           geom_geojson?: string | null
           id?: string
           length_m?: number
           municipio_id?: string
           nome?: string | null
+          nome_status?: string
           osm_id?: number
           snapshot_date?: string
           surface?: string
@@ -318,6 +354,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role: "admin" | "user"

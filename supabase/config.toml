@@ -20,3 +20,12 @@ verify_jwt = true
 
 [functions.compare-periods]
 verify_jwt = false
+
+[functions.ai-prioritize]
+verify_jwt = false
+
+[functions.ai-validate]
+verify_jwt = true
+
+[functions.enrich-vias]
+verify_jwt = true

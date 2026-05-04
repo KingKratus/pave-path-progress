@@ -12,6 +12,7 @@ import { Navbar } from "@/components/Navbar";
 import { LeafletMap } from "@/components/LeafletMap";
 import { PeriodComparison } from "@/components/PeriodComparison";
 import { AiPriorities } from "@/components/AiPriorities";
+import { MunicipioInsights } from "@/components/MunicipioInsights";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RoadData {
@@ -34,7 +35,9 @@ const MunicipioDetail = () => {
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [municipioId, setMunicipioId] = useState<string | null>(null);
   const [boundary, setBoundary] = useState<any>(null);
-
+  const [tab, setTab] = useState("mapa");
+  const [focusOsmId, setFocusOsmId] = useState<number | null>(searchParams.get("focus") ? Number(searchParams.get("focus")) : null);
+  const selectRoad = (osmId: number) => { setFocusOsmId(osmId); setTab("mapa"); };
   // Filtros para lista
   const [filterSurface, setFilterSurface] = useState("all");
   const [filterName, setFilterName] = useState("all"); // all|named|unnamed
@@ -192,18 +195,19 @@ const MunicipioDetail = () => {
               </CardContent></Card>
             </div>
 
-            <Tabs defaultValue="mapa">
-              <TabsList>
+            <Tabs value={tab} onValueChange={setTab}>
+              <TabsList className="overflow-x-auto">
                 <TabsTrigger value="mapa">Mapa</TabsTrigger>
                 <TabsTrigger value="lista">Lista</TabsTrigger>
+                <TabsTrigger value="insights">Insights</TabsTrigger>
                 <TabsTrigger value="comparacao">Comparação</TabsTrigger>
-                <TabsTrigger value="ia"><Sparkles className="mr-1 h-3 w-3" />Prioridades IA</TabsTrigger>
+                <TabsTrigger value="ia"><Sparkles className="mr-1 h-3 w-3" />IA</TabsTrigger>
               </TabsList>
 
               <TabsContent value="mapa">
                 <Card className="overflow-hidden">
                   <div className="h-[500px]">
-                    <LeafletMap roads={roads} cityName={cityName} boundaryGeoJson={boundary} />
+                    <LeafletMap roads={roads.map(r => ({ ...r, name: r.name || "" }))} cityName={cityName} boundaryGeoJson={boundary} focusOsmId={focusOsmId} />
                   </div>
                 </Card>
                 {!boundary && (
@@ -276,8 +280,12 @@ const MunicipioDetail = () => {
                 </Card>
               </TabsContent>
 
+              <TabsContent value="insights">
+                <MunicipioInsights municipioId={municipioId} />
+              </TabsContent>
+
               <TabsContent value="comparacao">
-                <PeriodComparison municipioId={municipioId} />
+                <PeriodComparison municipioId={municipioId} onSelectRoad={selectRoad} />
               </TabsContent>
 
               <TabsContent value="ia">
