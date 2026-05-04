@@ -38,14 +38,12 @@ async function queryOverpass(query: string): Promise<any> {
       lastErr = new Error(`Overpass ${res.status} @ ${endpoint}: ${(await res.text()).slice(0, 200)}`);
       console.warn(lastErr.message);
     } catch (e: any) {
-      lastErr = e;
-      console.warn(`Overpass fetch failed @ ${endpoint}: ${e.message}`);
+      lastErr = e; console.warn(`Overpass fetch failed @ ${endpoint}: ${e.message}`);
     }
   }
   throw lastErr || new Error("All Overpass endpoints failed");
 }
 
-// Point in polygon (ray casting). polygon: [[lon, lat], ...]
 function pointInPolygon(point: [number, number], polygon: number[][]): boolean {
   const [x, y] = point;
   let inside = false;
@@ -73,7 +71,13 @@ const ALLOWED_HIGHWAYS = new Set([
 
 function pickName(tags: any): string | null {
   if (!tags) return null;
-  return tags.name || tags["name:pt"] || tags.alt_name || tags.loc_name || tags.ref || null;
+  return tags.name || tags["name:pt"] || tags.alt_name || tags.official_name ||
+    tags.loc_name || tags["addr:street"] || tags.ref || null;
+}
+
+function pickBairro(tags: any): string | null {
+  if (!tags) return null;
+  return tags["addr:suburb"] || tags["addr:neighbourhood"] || tags["addr:district"] || null;
 }
 
 serve(async (req) => {
@@ -116,7 +120,6 @@ serve(async (req) => {
     }
     municipioId = mun!.id;
 
-    // Compute attempt number for retry chains
     let attempt = 1;
     if (parentLogId) {
       const { count } = await supabase
@@ -134,7 +137,6 @@ serve(async (req) => {
       .select("id").single();
     logId = logRow?.id ?? null;
 
-    // -------- STAGE: overpass (boundary) --------
     errorStage = "overpass";
     const boundaryQuery = `[out:json][timeout:60];
 relation["name"="${municipio.replace(/"/g, '\\"')}"]["boundary"="administrative"]["admin_level"~"7|8"]${uf ? `["ISO3166-2"~"BR-${uf}"]` : ''};
@@ -159,7 +161,6 @@ out geom;`;
       console.warn("boundary fetch failed:", (e as Error).message);
     }
 
-    // -------- STAGE: overpass (ways) --------
     const waysQuery = `[out:json][timeout:120];
 (area["name"="${municipio.replace(/"/g, '\\"')}"]["boundary"="administrative"]["admin_level"~"7|8"];)->.a;
 (way(area.a)["highway"]["surface"~"unpaved|dirt|gravel|ground|earth|compacted|sand|mud|fine_gravel|pebblestone"];);
@@ -167,12 +168,32 @@ out body;>;out skel qt;`;
     const data = await queryOverpass(waysQuery);
     const elements = data.elements || [];
 
-    // -------- STAGE: ingest --------
     errorStage = "ingest";
     const nodes: Record<number, { lat: number; lon: number }> = {};
     for (const el of elements) if (el.type === "node") nodes[el.id] = { lat: el.lat, lon: el.lon };
 
     const ways = elements.filter((e: any) => e.type === "way");
+
+    // Build named-roads index for inheriting names from neighboring ways
+    const namedRoads: { name: string; coords: [number, number][] }[] = [];
+    for (const w of ways) {
+      const nm = pickName(w.tags);
+      if (!nm) continue;
+      const cs: [number, number][] = (w.nodes || []).map((id: number) => nodes[id]).filter(Boolean).map((n: any) => [n.lon, n.lat]);
+      if (cs.length >= 2) namedRoads.push({ name: nm, coords: cs });
+    }
+
+    const inheritName = (mid: [number, number]): string | null => {
+      let best: { name: string; d: number } | null = null;
+      for (const r of namedRoads) {
+        for (const c of r.coords) {
+          const d = haversine(mid[1], mid[0], c[1], c[0]);
+          if (d < 35 && (!best || d < best.d)) best = { name: r.name, d };
+        }
+      }
+      return best?.name || null;
+    };
+
     const roads: any[] = [];
     const snapshotVias: any[] = [];
     for (const way of ways) {
@@ -192,22 +213,27 @@ out body;>;out skel qt;`;
       }
       if (coords.length < 2) continue;
 
-      // Centroid filter against boundary
-      if (boundaryGeom) {
-        const mid = coords[Math.floor(coords.length / 2)];
-        if (!pointInMulti(mid, boundaryGeom)) continue;
-      }
+      const mid = coords[Math.floor(coords.length / 2)] as [number, number];
+      if (boundaryGeom && !pointInMulti(mid, boundaryGeom)) continue;
 
-      const nome = pickName(way.tags);
+      let nome = pickName(way.tags);
+      let nomeStatus: "ok" | "herdado" | "sem_nome" = nome ? "ok" : "sem_nome";
+      if (!nome) {
+        const inh = inheritName(mid);
+        if (inh) { nome = inh; nomeStatus = "herdado"; }
+      }
+      const bairro = pickBairro(way.tags);
       const surface = way.tags?.surface || "unpaved";
       const lengthM = Math.round(len * 10) / 10;
 
       roads.push({
         osm_id: way.id, municipio_id: municipioId, nome,
         surface, length_m: lengthM,
+        centroid_lat: mid[1], centroid_lng: mid[0],
+        nome_status: nomeStatus, bairro,
         geom_geojson: JSON.stringify({ type: "LineString", coordinates: coords }),
       });
-      snapshotVias.push({ osm_id: way.id, nome, surface, length_m: lengthM });
+      snapshotVias.push({ osm_id: way.id, nome, surface, length_m: lengthM, bairro });
     }
 
     await supabase.from("vias").delete().eq("municipio_id", municipioId);
@@ -215,7 +241,6 @@ out body;>;out skel qt;`;
       await supabase.from("vias").insert(roads.slice(i, i + 100));
     }
 
-    // -------- STAGE: calc --------
     errorStage = "calc";
     const totalKm = roads.reduce((s, r) => s + r.length_m, 0) / 1000;
     const bySurface: Record<string, number> = {};
