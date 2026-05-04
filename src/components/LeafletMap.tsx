@@ -5,6 +5,7 @@ import { MapLegend } from "./MapLegend";
 
 interface Road {
   id: string;
+  osm_id?: number;
   name: string;
   surface: string;
   length_m: number;
@@ -16,20 +17,16 @@ interface LeafletMapProps {
   cityName: string;
   boundaryGeoJson?: any;
   highlightOsmIds?: Set<number>;
+  focusOsmId?: number | null;
 }
 
 const SURFACE_COLORS: Record<string, string> = {
-  unpaved: "#ef4444",
-  dirt: "#f97316",
-  gravel: "#eab308",
-  ground: "#dc2626",
-  earth: "#b91c1c",
-  compacted: "#f59e0b",
-  sand: "#fbbf24",
-  mud: "#92400e",
+  unpaved: "#ef4444", dirt: "#f97316", gravel: "#eab308",
+  ground: "#dc2626", earth: "#b91c1c", compacted: "#f59e0b",
+  sand: "#fbbf24", mud: "#92400e",
 };
 
-const TILE_STYLES: Record<string, { url: string; attribution: string; max?: number }> = {
+const TILE_STYLES: Record<string, { url: string; attribution: string }> = {
   osm: { url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", attribution: "© OpenStreetMap" },
   carto_light: { url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", attribution: "© OSM © Carto" },
   carto_dark: { url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", attribution: "© OSM © Carto" },
@@ -37,10 +34,10 @@ const TILE_STYLES: Record<string, { url: string; attribution: string; max?: numb
   topo: { url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", attribution: "© OpenTopoMap" },
 };
 
-export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds }: LeafletMapProps) => {
+export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, focusOsmId }: LeafletMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
-  const tileLayer = useRef<L.TileLayer | null>(null);
+  const roadLayer = useRef<L.GeoJSON | null>(null);
   const [style, setStyle] = useState<string>(() => localStorage.getItem("mapStyle") || "osm");
 
   useEffect(() => {
@@ -51,16 +48,13 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds }
     mapInstance.current = map;
 
     const t = TILE_STYLES[style] || TILE_STYLES.osm;
-    tileLayer.current = L.tileLayer(t.url, { attribution: t.attribution }).addTo(map);
+    L.tileLayer(t.url, { attribution: t.attribution }).addTo(map);
 
-    // Boundary + dark mask outside the city
     if (boundaryGeoJson) {
       try {
         L.geoJSON(boundaryGeoJson, {
           style: { color: "#16a34a", weight: 2, fillOpacity: 0, dashArray: "4 4" },
         }).addTo(map);
-
-        // Mask
         const world: [number, number][] = [[-90, -180], [-90, 180], [90, 180], [90, -180], [-90, -180]];
         const holes: [number, number][][] = [];
         const collect = (g: any) => {
@@ -69,30 +63,29 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds }
         };
         collect(boundaryGeoJson);
         L.polygon([world, ...holes], { color: "transparent", fillColor: "#000", fillOpacity: 0.45, interactive: false }).addTo(map);
-
         const layer = L.geoJSON(boundaryGeoJson);
         const b = layer.getBounds();
         map.fitBounds(b, { padding: [20, 20] });
         map.setMaxBounds(b.pad(0.3));
-        map.setMinZoom(map.getZoom() - 1);
       } catch (e) { console.warn("boundary render failed", e); }
     }
 
     const features = roads.filter((r) => r.geojson).map((r) => ({
       type: "Feature" as const,
-      properties: { id: r.id, name: r.name, surface: r.surface, length_m: r.length_m },
+      properties: { id: r.id, osm_id: r.osm_id, name: r.name, surface: r.surface, length_m: r.length_m },
       geometry: r.geojson,
     }));
 
     if (features.length > 0) {
       const layer = L.geoJSON({ type: "FeatureCollection", features } as any, {
         style: (f) => {
-          const isHL = highlightOsmIds?.has(Number(f?.properties?.id));
+          const oid = Number(f?.properties?.osm_id);
+          const isHL = highlightOsmIds?.has(oid);
+          const isFocus = focusOsmId && oid === focusOsmId;
           return {
-            color: SURFACE_COLORS[f?.properties?.surface] || "#ef4444",
-            weight: isHL ? 5 : 3,
-            opacity: isHL ? 1 : 0.8,
-            dashArray: isHL ? undefined : undefined,
+            color: isFocus ? "#22d3ee" : (SURFACE_COLORS[f?.properties?.surface] || "#ef4444"),
+            weight: isFocus ? 7 : isHL ? 5 : 3,
+            opacity: isFocus ? 1 : isHL ? 1 : 0.8,
           };
         },
         onEachFeature: (f, l) => {
@@ -102,19 +95,26 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds }
               p.length_m >= 1000 ? (p.length_m / 1000).toFixed(2) + " km" : p.length_m.toFixed(0) + " m"
             }`
           );
+          if (focusOsmId && Number(p.osm_id) === focusOsmId) {
+            setTimeout(() => {
+              try {
+                const b = (l as any).getBounds();
+                map.flyToBounds(b, { maxZoom: 18, padding: [40, 40], duration: 0.8 });
+                (l as any).openPopup();
+              } catch {}
+            }, 200);
+          }
         },
       });
       layer.addTo(map);
-      if (!boundaryGeoJson) map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+      roadLayer.current = layer;
+      if (!boundaryGeoJson && !focusOsmId) map.fitBounds(layer.getBounds(), { padding: [20, 20] });
     }
 
     return () => { map.remove(); mapInstance.current = null; };
-  }, [roads, cityName, boundaryGeoJson, style, highlightOsmIds]);
+  }, [roads, cityName, boundaryGeoJson, style, highlightOsmIds, focusOsmId]);
 
-  const changeStyle = (s: string) => {
-    setStyle(s);
-    localStorage.setItem("mapStyle", s);
-  };
+  const changeStyle = (s: string) => { setStyle(s); localStorage.setItem("mapStyle", s); };
 
   return (
     <div className="relative h-full w-full">
