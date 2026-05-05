@@ -88,8 +88,8 @@ export function AlertsPanel() {
     });
 
     // 3) Provider IA inválido
-    const { data: ai } = await supabase
-      .from("ai_provider_settings" as any)
+    const { data: ai } = await (supabase as any)
+      .from("ai_provider_settings")
       .select("provider, model")
       .eq("id", "default")
       .maybeSingle();
