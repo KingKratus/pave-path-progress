@@ -17,6 +17,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, RefreshCw, Calculator, MapIcon, AlertCircle, CheckCircle2, RotateCcw, Eye } from "lucide-react";
 import { AiProvidersPanel } from "@/components/admin/AiProvidersPanel";
+import { AlertsPanel } from "@/components/admin/AlertsPanel";
 import { toast } from "@/hooks/use-toast";
 
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
@@ -197,8 +198,9 @@ const Admin = () => {
           <Button variant="outline" onClick={() => supabase.auth.signOut().then(() => navigate("/"))}>Sair</Button>
         </div>
 
-        <Tabs defaultValue="sync">
+        <Tabs defaultValue="alertas">
           <TabsList className="overflow-x-auto">
+            <TabsTrigger value="alertas">Alertas</TabsTrigger>
             <TabsTrigger value="sync">Sincronização</TabsTrigger>
             <TabsTrigger value="municipios">Municípios</TabsTrigger>
             <TabsTrigger value="uf">Sync por UF</TabsTrigger>
@@ -206,6 +208,11 @@ const Admin = () => {
             <TabsTrigger value="ranking">Ranking</TabsTrigger>
             <TabsTrigger value="ia">IA Providers</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="alertas">
+            <AlertsPanel />
+          </TabsContent>
+
 
           <TabsContent value="sync">
             <Card>
