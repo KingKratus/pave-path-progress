@@ -18,6 +18,8 @@ interface LeafletMapProps {
   boundaryGeoJson?: any;
   highlightOsmIds?: Set<number>;
   focusOsmId?: number | null;
+  bairro?: string | null;
+  uf?: string;
 }
 
 const SURFACE_COLORS: Record<string, string> = {
@@ -34,11 +36,34 @@ const TILE_STYLES: Record<string, { url: string; attribution: string }> = {
   topo: { url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", attribution: "© OpenTopoMap" },
 };
 
-export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, focusOsmId }: LeafletMapProps) => {
+const bairroCache = new Map<string, any>();
+
+async function fetchBairroPolygon(bairro: string, city: string, uf?: string): Promise<any | null> {
+  const key = `${bairro}|${city}|${uf || ""}`;
+  if (bairroCache.has(key)) return bairroCache.get(key);
+  try {
+    const q = encodeURIComponent(`${bairro}, ${city}${uf ? ", " + uf : ""}, Brasil`);
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&polygon_geojson=1&limit=1`, {
+      headers: { "Accept": "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const geo = data?.[0]?.geojson || null;
+    bairroCache.set(key, geo);
+    return geo;
+  } catch { return null; }
+}
+
+export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, focusOsmId, bairro, uf }: LeafletMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
-  const roadLayer = useRef<L.GeoJSON | null>(null);
   const [style, setStyle] = useState<string>(() => localStorage.getItem("mapStyle") || "osm");
+  const [bairroGeo, setBairroGeo] = useState<any>(null);
+
+  useEffect(() => {
+    setBairroGeo(null);
+    if (bairro && cityName) fetchBairroPolygon(bairro, cityName, uf).then(setBairroGeo);
+  }, [bairro, cityName, uf]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -53,7 +78,7 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
     if (boundaryGeoJson) {
       try {
         L.geoJSON(boundaryGeoJson, {
-          style: { color: "#16a34a", weight: 2, fillOpacity: 0, dashArray: "4 4" },
+          style: { color: "hsl(158 64% 24%)", weight: 2, fillOpacity: 0, dashArray: "4 4" },
         }).addTo(map);
         const world: [number, number][] = [[-90, -180], [-90, 180], [90, 180], [90, -180], [-90, -180]];
         const holes: [number, number][][] = [];
@@ -70,6 +95,17 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
       } catch (e) { console.warn("boundary render failed", e); }
     }
 
+    if (bairroGeo) {
+      try {
+        const layer = L.geoJSON(bairroGeo, {
+          style: { color: "hsl(47 92% 53%)", weight: 3, fillColor: "hsl(47 92% 53%)", fillOpacity: 0.15 },
+        }).addTo(map);
+        const tooltip = L.tooltip({ permanent: true, direction: "center", className: "bairro-label" }).setContent(bairro || "");
+        layer.bindTooltip(tooltip);
+        map.flyToBounds(layer.getBounds(), { padding: [30, 30], duration: 0.6, maxZoom: 16 });
+      } catch (e) { console.warn("bairro render failed", e); }
+    }
+
     const features = roads.filter((r) => r.geojson).map((r) => ({
       type: "Feature" as const,
       properties: { id: r.id, osm_id: r.osm_id, name: r.name, surface: r.surface, length_m: r.length_m },
@@ -83,9 +119,9 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
           const isHL = highlightOsmIds?.has(oid);
           const isFocus = focusOsmId && oid === focusOsmId;
           return {
-            color: isFocus ? "#22d3ee" : (SURFACE_COLORS[f?.properties?.surface] || "#ef4444"),
+            color: isFocus ? "#06b6d4" : (SURFACE_COLORS[f?.properties?.surface] || "#ef4444"),
             weight: isFocus ? 7 : isHL ? 5 : 3,
-            opacity: isFocus ? 1 : isHL ? 1 : 0.8,
+            opacity: isFocus ? 1 : isHL ? 1 : 0.85,
           };
         },
         onEachFeature: (f, l) => {
@@ -102,24 +138,23 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
                 map.flyToBounds(b, { maxZoom: 18, padding: [40, 40], duration: 0.8 });
                 (l as any).openPopup();
               } catch {}
-            }, 200);
+            }, 250);
           }
         },
       });
       layer.addTo(map);
-      roadLayer.current = layer;
-      if (!boundaryGeoJson && !focusOsmId) map.fitBounds(layer.getBounds(), { padding: [20, 20] });
+      if (!boundaryGeoJson && !focusOsmId && !bairroGeo) map.fitBounds(layer.getBounds(), { padding: [20, 20] });
     }
 
     return () => { map.remove(); mapInstance.current = null; };
-  }, [roads, cityName, boundaryGeoJson, style, highlightOsmIds, focusOsmId]);
+  }, [roads, cityName, boundaryGeoJson, style, highlightOsmIds, focusOsmId, bairroGeo, bairro]);
 
   const changeStyle = (s: string) => { setStyle(s); localStorage.setItem("mapStyle", s); };
 
   return (
     <div className="relative h-full w-full">
       <div ref={mapRef} className="h-full w-full" />
-      <div className="absolute top-2 right-2 z-[400] rounded-md border border-border bg-card/95 px-2 py-1 text-xs shadow backdrop-blur">
+      <div className="absolute top-2 right-2 z-[400] rounded-xl border border-border bg-card/95 px-3 py-1.5 text-xs font-medium shadow-soft backdrop-blur">
         <select value={style} onChange={(e) => changeStyle(e.target.value)} className="bg-transparent text-foreground outline-none">
           <option value="osm">OSM padrão</option>
           <option value="carto_light">Carto Light</option>
@@ -128,6 +163,11 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
           <option value="topo">Topográfico</option>
         </select>
       </div>
+      {bairro && (
+        <div className="absolute top-2 left-2 z-[400] rounded-full border border-secondary/40 bg-secondary/20 px-3 py-1 text-xs font-semibold text-accent-foreground backdrop-blur">
+          Bairro: {bairro}{!bairroGeo && " (carregando…)"}
+        </div>
+      )}
       <MapLegend />
     </div>
   );

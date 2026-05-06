@@ -201,6 +201,7 @@ out body;>;out skel qt;`;
       if (highway && !ALLOWED_HIGHWAYS.has(highway)) continue;
 
       const coords: [number, number][] = [];
+      const segLens: number[] = [];
       let len = 0;
       for (let i = 0; i < (way.nodes || []).length; i++) {
         const n = nodes[way.nodes[i]];
@@ -208,12 +209,30 @@ out body;>;out skel qt;`;
         coords.push([n.lon, n.lat]);
         if (i > 0) {
           const p = nodes[way.nodes[i - 1]];
-          if (p) len += haversine(p.lat, p.lon, n.lat, n.lon);
+          if (p) {
+            const d = haversine(p.lat, p.lon, n.lat, n.lon);
+            len += d;
+            segLens.push(d);
+          }
         }
       }
       if (coords.length < 2) continue;
 
-      const mid = coords[Math.floor(coords.length / 2)] as [number, number];
+      // Centroide real: ponto na metade do comprimento acumulado (não índice)
+      let mid: [number, number] = coords[Math.floor(coords.length / 2)] as [number, number];
+      if (len > 0 && segLens.length > 0) {
+        const half = len / 2;
+        let acc = 0;
+        for (let i = 0; i < segLens.length; i++) {
+          if (acc + segLens[i] >= half) {
+            const t = segLens[i] === 0 ? 0 : (half - acc) / segLens[i];
+            const a = coords[i], b = coords[i + 1];
+            mid = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+            break;
+          }
+          acc += segLens[i];
+        }
+      }
       if (boundaryGeom && !pointInMulti(mid, boundaryGeom)) continue;
 
       let nome = pickName(way.tags);
