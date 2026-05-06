@@ -28,6 +28,7 @@ const MunicipioDetail = () => {
   const { nome } = useParams<{ nome: string }>();
   const [searchParams] = useSearchParams();
   const uf = searchParams.get("uf") || undefined;
+  const bairroParam = searchParams.get("bairro");
   const cityName = decodeURIComponent(nome || "");
   const [roads, setRoads] = useState<RoadData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -207,7 +208,7 @@ const MunicipioDetail = () => {
               <TabsContent value="mapa">
                 <Card className="overflow-hidden">
                   <div className="h-[500px]">
-                    <LeafletMap roads={roads.map(r => ({ ...r, name: r.name || "" }))} cityName={cityName} boundaryGeoJson={boundary} focusOsmId={focusOsmId} />
+                    <LeafletMap roads={roads.map(r => ({ ...r, name: r.name || "" }))} cityName={cityName} boundaryGeoJson={boundary} focusOsmId={focusOsmId} bairro={bairroParam} uf={uf} />
                   </div>
                 </Card>
                 {!boundary && (
