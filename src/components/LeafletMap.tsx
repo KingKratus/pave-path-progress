@@ -173,8 +173,10 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
         </select>
       </div>
       {bairro && (
-        <div className="absolute top-2 left-2 z-[400] rounded-full border border-secondary/40 bg-secondary/20 px-3 py-1 text-xs font-semibold text-accent-foreground backdrop-blur">
-          Bairro: {bairro}{!bairroGeo && " (carregando…)"}
+        <div className={`absolute top-2 left-2 z-[400] rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur ${bairroError ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-secondary/40 bg-secondary/20 text-accent-foreground"}`}>
+          Bairro: {bairro}
+          {bairroLoading && " (carregando…)"}
+          {bairroError && ` · ${bairroError}`}
         </div>
       )}
       <MapLegend />
