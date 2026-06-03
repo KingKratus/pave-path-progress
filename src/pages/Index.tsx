@@ -16,8 +16,11 @@ const Index = () => {
     [ibge, search]
   );
 
-  const goTo = (nome: string, uf?: string) =>
-    navigate(`/municipio/${encodeURIComponent(nome)}${uf ? `?uf=${uf}` : ""}`);
+  const goTo = (nome: string, uf?: string) => {
+    const n = (nome || "").trim();
+    if (!n) return;
+    navigate(`/municipio/${encodeURIComponent(n)}${uf ? `?uf=${uf}` : ""}`);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
