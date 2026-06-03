@@ -167,8 +167,8 @@ const MunicipioDetail = () => {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="mb-4 h-12 w-12 animate-spin text-primary" />
-            <p className="text-lg font-medium text-foreground">Consultando dados do OpenStreetMap...</p>
-            <p className="text-sm text-muted-foreground">Isso pode levar alguns segundos</p>
+            <p className="text-lg font-medium text-foreground">{loadingStage}</p>
+            <p className="text-sm text-muted-foreground">Aguarde — dados vindos do OpenStreetMap</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-20">
