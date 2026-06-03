@@ -16,8 +16,11 @@ const Index = () => {
     [ibge, search]
   );
 
-  const goTo = (nome: string, uf?: string) =>
-    navigate(`/municipio/${encodeURIComponent(nome)}${uf ? `?uf=${uf}` : ""}`);
+  const goTo = (nome: string, uf?: string) => {
+    const n = (nome || "").trim();
+    if (!n) return;
+    navigate(`/municipio/${encodeURIComponent(n)}${uf ? `?uf=${uf}` : ""}`);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +39,7 @@ const Index = () => {
         <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-secondary/30 blur-3xl" />
         <div className="absolute -left-24 bottom-0 h-72 w-72 rounded-full bg-primary-glow/40 blur-3xl" />
 
-        <div className="container relative mx-auto px-4 py-20 md:py-28">
+        <div className="container relative mx-auto px-4 pt-20 pb-40 md:pt-28 md:pb-48">
           <div className="mx-auto max-w-3xl text-center">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-secondary/40 bg-secondary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-secondary backdrop-blur">
               <Sparkles className="h-3.5 w-3.5" />
@@ -44,13 +47,13 @@ const Index = () => {
             </div>
             <h1 className="font-display text-5xl font-bold leading-[0.95] tracking-tight text-primary-foreground md:text-7xl text-balance">
               Cada rua sem asfalto,
-              <span className="block bg-gradient-gold bg-clip-text text-transparent">visível em um clique.</span>
+              <span className="block bg-gradient-gold bg-clip-text text-transparent drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]">visível em um clique.</span>
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-base text-primary-foreground/75 md:text-lg">
               Consulte vias não pavimentadas em qualquer município brasileiro. Compare períodos, gere relatórios e cobre seus prefeitos.
             </p>
 
-            <form onSubmit={handleSubmit} className="relative mx-auto mt-10 max-w-xl">
+            <form onSubmit={handleSubmit} className="relative z-40 mx-auto mt-10 max-w-xl">
               <div className="relative rounded-2xl bg-card p-1.5 shadow-glow">
                 <div className="relative flex items-center">
                   <Search className="absolute left-4 h-5 w-5 text-muted-foreground" />
@@ -90,7 +93,7 @@ const Index = () => {
       </section>
 
       {/* BENTO GRID */}
-      <section className="container mx-auto -mt-12 px-4 pb-16">
+      <section className="container relative z-20 mx-auto -mt-24 px-4 pb-16">
         <div className="grid gap-4 md:grid-cols-6 md:auto-rows-[140px]">
           {/* Pilot — span 4 / 2 rows */}
           <button

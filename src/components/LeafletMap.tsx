@@ -38,20 +38,22 @@ const TILE_STYLES: Record<string, { url: string; attribution: string }> = {
 
 const bairroCache = new Map<string, any>();
 
-async function fetchBairroPolygon(bairro: string, city: string, uf?: string): Promise<any | null> {
+async function fetchBairroPolygon(bairro: string, city: string, uf?: string): Promise<{ geo: any; error?: string }> {
   const key = `${bairro}|${city}|${uf || ""}`;
-  if (bairroCache.has(key)) return bairroCache.get(key);
+  if (bairroCache.has(key)) return { geo: bairroCache.get(key) };
   try {
     const q = encodeURIComponent(`${bairro}, ${city}${uf ? ", " + uf : ""}, Brasil`);
     const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&polygon_geojson=1&limit=1`, {
       headers: { "Accept": "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { geo: null, error: `Nominatim ${res.status}` };
     const data = await res.json();
     const geo = data?.[0]?.geojson || null;
     bairroCache.set(key, geo);
-    return geo;
-  } catch { return null; }
+    return { geo, error: geo ? undefined : "Bairro não encontrado no Nominatim" };
+  } catch (e: any) {
+    return { geo: null, error: e?.message || "Falha ao buscar bairro" };
+  }
 }
 
 export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, focusOsmId, bairro, uf }: LeafletMapProps) => {
@@ -59,10 +61,17 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
   const mapInstance = useRef<L.Map | null>(null);
   const [style, setStyle] = useState<string>(() => localStorage.getItem("mapStyle") || "osm");
   const [bairroGeo, setBairroGeo] = useState<any>(null);
+  const [bairroError, setBairroError] = useState<string | null>(null);
+  const [bairroLoading, setBairroLoading] = useState(false);
 
   useEffect(() => {
-    setBairroGeo(null);
-    if (bairro && cityName) fetchBairroPolygon(bairro, cityName, uf).then(setBairroGeo);
+    setBairroGeo(null); setBairroError(null);
+    if (bairro && cityName) {
+      setBairroLoading(true);
+      fetchBairroPolygon(bairro, cityName, uf).then(({ geo, error }) => {
+        setBairroGeo(geo); setBairroError(error || null); setBairroLoading(false);
+      });
+    }
   }, [bairro, cityName, uf]);
 
   useEffect(() => {
@@ -164,8 +173,10 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
         </select>
       </div>
       {bairro && (
-        <div className="absolute top-2 left-2 z-[400] rounded-full border border-secondary/40 bg-secondary/20 px-3 py-1 text-xs font-semibold text-accent-foreground backdrop-blur">
-          Bairro: {bairro}{!bairroGeo && " (carregando…)"}
+        <div className={`absolute top-2 left-2 z-[400] rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur ${bairroError ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-secondary/40 bg-secondary/20 text-accent-foreground"}`}>
+          Bairro: {bairro}
+          {bairroLoading && " (carregando…)"}
+          {bairroError && ` · ${bairroError}`}
         </div>
       )}
       <MapLegend />
