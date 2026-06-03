@@ -38,20 +38,22 @@ const TILE_STYLES: Record<string, { url: string; attribution: string }> = {
 
 const bairroCache = new Map<string, any>();
 
-async function fetchBairroPolygon(bairro: string, city: string, uf?: string): Promise<any | null> {
+async function fetchBairroPolygon(bairro: string, city: string, uf?: string): Promise<{ geo: any; error?: string }> {
   const key = `${bairro}|${city}|${uf || ""}`;
-  if (bairroCache.has(key)) return bairroCache.get(key);
+  if (bairroCache.has(key)) return { geo: bairroCache.get(key) };
   try {
     const q = encodeURIComponent(`${bairro}, ${city}${uf ? ", " + uf : ""}, Brasil`);
     const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&polygon_geojson=1&limit=1`, {
       headers: { "Accept": "application/json" },
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { geo: null, error: `Nominatim ${res.status}` };
     const data = await res.json();
     const geo = data?.[0]?.geojson || null;
     bairroCache.set(key, geo);
-    return geo;
-  } catch { return null; }
+    return { geo, error: geo ? undefined : "Bairro não encontrado no Nominatim" };
+  } catch (e: any) {
+    return { geo: null, error: e?.message || "Falha ao buscar bairro" };
+  }
 }
 
 export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, focusOsmId, bairro, uf }: LeafletMapProps) => {
