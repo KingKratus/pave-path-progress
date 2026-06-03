@@ -65,6 +65,12 @@ const Auth = () => {
         </div>
         <div className="bento p-8 md:max-w-md md:justify-self-end md:w-full">
           <h2 className="mb-6 font-display text-2xl font-bold">Entrar</h2>
+          <Button variant="outline" onClick={signInGoogle} className="mb-4 w-full gap-2">
+            <GoogleIcon /> Continuar com Google
+          </Button>
+          <div className="my-4 flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="h-px flex-1 bg-border" /> ou <div className="h-px flex-1 bg-border" />
+          </div>
           <Tabs defaultValue="signin">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Entrar</TabsTrigger>
