@@ -29,9 +29,10 @@ const MunicipioDetail = () => {
   const [searchParams] = useSearchParams();
   const uf = searchParams.get("uf") || undefined;
   const bairroParam = searchParams.get("bairro");
-  const cityName = decodeURIComponent(nome || "");
+  const cityName = decodeURIComponent(nome || "").trim();
   const [roads, setRoads] = useState<RoadData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingStage, setLoadingStage] = useState<string>("Iniciando...");
   const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
   const [municipioId, setMunicipioId] = useState<string | null>(null);
@@ -41,20 +42,24 @@ const MunicipioDetail = () => {
   const selectRoad = (osmId: number) => { setFocusOsmId(osmId); setTab("mapa"); };
   // Filtros para lista
   const [filterSurface, setFilterSurface] = useState("all");
-  const [filterName, setFilterName] = useState("all"); // all|named|unnamed
+  const [filterName, setFilterName] = useState("all");
   const [filterMinLen, setFilterMinLen] = useState(0);
   const [filterSearch, setFilterSearch] = useState("");
 
   const fetchRoads = useCallback(async () => {
+    if (!cityName) { setError("Nome do município inválido."); setLoading(false); return; }
     setLoading(true);
     setError(null);
+    setLoadingStage("Buscando município...");
     try {
       const { data: mun } = await supabase
         .from("municipios").select("id, last_sync_at, geom_geojson")
         .eq("nome", cityName).maybeSingle();
 
       const loadVias = async (id: string) => {
-        const { data: vias } = await supabase.from("vias").select("*").eq("municipio_id", id);
+        setLoadingStage("Carregando vias do município...");
+        const { data: vias, error: vErr } = await supabase.from("vias").select("*").eq("municipio_id", id);
+        if (vErr) throw vErr;
         setRoads((vias || []).map((v: any) => ({
           id: v.id, osm_id: v.osm_id, name: v.nome, surface: v.surface, length_m: v.length_m,
           geojson: v.geom_geojson ? JSON.parse(v.geom_geojson) : null,
@@ -72,11 +77,13 @@ const MunicipioDetail = () => {
         }
       }
 
+      setLoadingStage("Sincronizando dados do OpenStreetMap (pode levar 20–60s)...");
       const { error: fnError } = await supabase.functions.invoke("sync-municipio", {
         body: { municipio: cityName, uf },
       });
       if (fnError) throw fnError;
 
+      setLoadingStage("Atualizando vias após sincronização...");
       const { data: mun2 } = await supabase
         .from("municipios").select("id, last_sync_at, geom_geojson").eq("nome", cityName).maybeSingle();
       if (mun2) {
@@ -87,7 +94,7 @@ const MunicipioDetail = () => {
       }
     } catch (err: any) {
       console.error("Error fetching roads:", err);
-      setError("Não foi possível carregar os dados. Tente novamente em alguns instantes.");
+      setError(err?.message ? `Falha ao carregar: ${err.message}` : "Não foi possível carregar os dados. Tente novamente em alguns instantes.");
     } finally {
       setLoading(false);
     }
