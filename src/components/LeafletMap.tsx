@@ -61,10 +61,17 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
   const mapInstance = useRef<L.Map | null>(null);
   const [style, setStyle] = useState<string>(() => localStorage.getItem("mapStyle") || "osm");
   const [bairroGeo, setBairroGeo] = useState<any>(null);
+  const [bairroError, setBairroError] = useState<string | null>(null);
+  const [bairroLoading, setBairroLoading] = useState(false);
 
   useEffect(() => {
-    setBairroGeo(null);
-    if (bairro && cityName) fetchBairroPolygon(bairro, cityName, uf).then(setBairroGeo);
+    setBairroGeo(null); setBairroError(null);
+    if (bairro && cityName) {
+      setBairroLoading(true);
+      fetchBairroPolygon(bairro, cityName, uf).then(({ geo, error }) => {
+        setBairroGeo(geo); setBairroError(error || null); setBairroLoading(false);
+      });
+    }
   }, [bairro, cityName, uf]);
 
   useEffect(() => {
