@@ -1,6 +1,6 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { MapPin, Route, Download, Loader2, AlertTriangle, Clock, Sparkles } from "lucide-react";
+import { MapPin, Route, Download, Loader2, AlertTriangle, Clock, Sparkles, Layers } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ import { LeafletMap } from "@/components/LeafletMap";
 import { PeriodComparison } from "@/components/PeriodComparison";
 import { AiPriorities } from "@/components/AiPriorities";
 import { MunicipioInsights } from "@/components/MunicipioInsights";
+import { BairroPanel } from "@/components/BairroPanel";
+import { BairroHistory } from "@/components/BairroHistory";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RoadData {
@@ -21,12 +23,13 @@ interface RoadData {
   name: string | null;
   surface: string;
   length_m: number;
+  bairro?: string | null;
   geojson: any;
 }
 
 const MunicipioDetail = () => {
   const { nome } = useParams<{ nome: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const uf = searchParams.get("uf") || undefined;
   const bairroParam = searchParams.get("bairro");
   const cityName = decodeURIComponent(nome || "").trim();
@@ -62,6 +65,7 @@ const MunicipioDetail = () => {
         if (vErr) throw vErr;
         setRoads((vias || []).map((v: any) => ({
           id: v.id, osm_id: v.osm_id, name: v.nome, surface: v.surface, length_m: v.length_m,
+          bairro: v.bairro,
           geojson: v.geom_geojson ? JSON.parse(v.geom_geojson) : null,
         })));
       };
@@ -113,9 +117,16 @@ const MunicipioDetail = () => {
       if (filterName === "unnamed" && r.name) return false;
       if (r.length_m < filterMinLen) return false;
       if (filterSearch && !(r.name || "").toLowerCase().includes(filterSearch.toLowerCase())) return false;
+      if (bairroParam && r.bairro !== bairroParam) return false;
       return true;
     });
-  }, [roads, filterSurface, filterName, filterMinLen, filterSearch]);
+  }, [roads, filterSurface, filterName, filterMinLen, filterSearch, bairroParam]);
+
+  const setBairro = (b: string | null) => {
+    const p = new URLSearchParams(searchParams);
+    if (b) p.set("bairro", b); else p.delete("bairro");
+    setSearchParams(p, { replace: true });
+  };
 
   const totalKm = roads.reduce((sum, r) => sum + r.length_m, 0) / 1000;
 
