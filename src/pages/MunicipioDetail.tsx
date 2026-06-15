@@ -1,6 +1,6 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { MapPin, Route, Download, Loader2, AlertTriangle, Clock, Sparkles } from "lucide-react";
+import { MapPin, Route, Download, Loader2, AlertTriangle, Clock, Sparkles, Layers } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ import { LeafletMap } from "@/components/LeafletMap";
 import { PeriodComparison } from "@/components/PeriodComparison";
 import { AiPriorities } from "@/components/AiPriorities";
 import { MunicipioInsights } from "@/components/MunicipioInsights";
+import { BairroPanel } from "@/components/BairroPanel";
+import { BairroHistory } from "@/components/BairroHistory";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RoadData {
@@ -21,12 +23,13 @@ interface RoadData {
   name: string | null;
   surface: string;
   length_m: number;
+  bairro?: string | null;
   geojson: any;
 }
 
 const MunicipioDetail = () => {
   const { nome } = useParams<{ nome: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const uf = searchParams.get("uf") || undefined;
   const bairroParam = searchParams.get("bairro");
   const cityName = decodeURIComponent(nome || "").trim();
@@ -62,6 +65,7 @@ const MunicipioDetail = () => {
         if (vErr) throw vErr;
         setRoads((vias || []).map((v: any) => ({
           id: v.id, osm_id: v.osm_id, name: v.nome, surface: v.surface, length_m: v.length_m,
+          bairro: v.bairro,
           geojson: v.geom_geojson ? JSON.parse(v.geom_geojson) : null,
         })));
       };
@@ -113,9 +117,16 @@ const MunicipioDetail = () => {
       if (filterName === "unnamed" && r.name) return false;
       if (r.length_m < filterMinLen) return false;
       if (filterSearch && !(r.name || "").toLowerCase().includes(filterSearch.toLowerCase())) return false;
+      if (bairroParam && r.bairro !== bairroParam) return false;
       return true;
     });
-  }, [roads, filterSurface, filterName, filterMinLen, filterSearch]);
+  }, [roads, filterSurface, filterName, filterMinLen, filterSearch, bairroParam]);
+
+  const setBairro = (b: string | null) => {
+    const p = new URLSearchParams(searchParams);
+    if (b) p.set("bairro", b); else p.delete("bairro");
+    setSearchParams(p, { replace: true });
+  };
 
   const totalKm = roads.reduce((sum, r) => sum + r.length_m, 0) / 1000;
 
@@ -208,16 +219,20 @@ const MunicipioDetail = () => {
                 <TabsTrigger value="mapa">Mapa</TabsTrigger>
                 <TabsTrigger value="lista">Lista</TabsTrigger>
                 <TabsTrigger value="insights">Insights</TabsTrigger>
+                <TabsTrigger value="historico"><Clock className="mr-1 h-3 w-3" />Histórico OSM</TabsTrigger>
                 <TabsTrigger value="comparacao">Comparação</TabsTrigger>
                 <TabsTrigger value="ia"><Sparkles className="mr-1 h-3 w-3" />IA</TabsTrigger>
               </TabsList>
 
               <TabsContent value="mapa">
-                <Card className="overflow-hidden">
-                  <div className="h-[500px]">
-                    <LeafletMap roads={roads.map(r => ({ ...r, name: r.name || "" }))} cityName={cityName} boundaryGeoJson={boundary} focusOsmId={focusOsmId} bairro={bairroParam} uf={uf} />
-                  </div>
-                </Card>
+                <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                  <Card className="overflow-hidden">
+                    <div className="h-[500px]">
+                      <LeafletMap roads={filteredRoads.map(r => ({ ...r, name: r.name || "" }))} cityName={cityName} boundaryGeoJson={boundary} focusOsmId={focusOsmId} bairro={bairroParam} uf={uf} />
+                    </div>
+                  </Card>
+                  <BairroPanel roads={roads} activeBairro={bairroParam} onSelect={setBairro} />
+                </div>
                 {!boundary && (
                   <p className="mt-2 text-xs text-muted-foreground">
                     Limite municipal não disponível ainda — sincronize novamente para restringir o mapa à cidade.
@@ -290,6 +305,10 @@ const MunicipioDetail = () => {
 
               <TabsContent value="insights">
                 <MunicipioInsights municipioId={municipioId} />
+              </TabsContent>
+
+              <TabsContent value="historico">
+                <BairroHistory city={cityName} uf={uf} bairro={bairroParam} />
               </TabsContent>
 
               <TabsContent value="comparacao">

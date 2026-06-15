@@ -29,3 +29,12 @@ verify_jwt = true
 
 [functions.enrich-vias]
 verify_jwt = true
+
+[functions.overpass-history]
+verify_jwt = false
+
+[functions.overpass-layers]
+verify_jwt = false
+
+[functions.refresh-stats]
+verify_jwt = true
