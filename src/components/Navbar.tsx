@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { MapPin, BarChart3, Info, Search, Shield, Route } from "lucide-react";
+import { GlobalSearchBar } from "./GlobalSearchBar";
 
 export const Navbar = () => {
   const { pathname } = useLocation();
@@ -23,6 +24,9 @@ export const Navbar = () => {
             <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Ranking civic</span>
           </div>
         </Link>
+        <div className="hidden flex-1 justify-center md:flex">
+          <GlobalSearchBar />
+        </div>
         <div className="flex items-center gap-1 overflow-x-auto">
           {links.map(({ to, label, icon: Icon }) => {
             const active = pathname === to || (to !== "/" && pathname.startsWith(to));
