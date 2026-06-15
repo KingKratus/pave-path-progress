@@ -397,10 +397,24 @@ const Admin = () => {
           <TabsContent value="ranking">
             <Card>
               <CardHeader><CardTitle>Recalcular ranking</CardTitle></CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-wrap gap-2">
                 <Button onClick={recalc} disabled={busy === "rank"} className="gap-2">
                   {busy === "rank" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}
                   Recalcular agora
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    setBusy("stats");
+                    const { error } = await supabase.functions.invoke("refresh-stats", { body: {} });
+                    setBusy(null);
+                    toast({ title: error ? "Erro" : "Stats atualizadas", description: error?.message || "Agregados UF/BR recalculados" });
+                  }}
+                  disabled={busy === "stats"}
+                  className="gap-2"
+                >
+                  {busy === "stats" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Atualizar agregados (UF/BR)
                 </Button>
               </CardContent>
             </Card>
