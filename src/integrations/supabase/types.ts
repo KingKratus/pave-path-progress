@@ -166,6 +166,36 @@ export type Database = {
           },
         ]
       }
+      stats_agregadas: {
+        Row: {
+          atualizado_em: string
+          key: string
+          municipios_sincronizados: number
+          scope: string
+          total_km_paved: number
+          total_km_unpaved: number
+          total_vias: number
+        }
+        Insert: {
+          atualizado_em?: string
+          key: string
+          municipios_sincronizados?: number
+          scope: string
+          total_km_paved?: number
+          total_km_unpaved?: number
+          total_vias?: number
+        }
+        Update: {
+          atualizado_em?: string
+          key?: string
+          municipios_sincronizados?: number
+          scope?: string
+          total_km_paved?: number
+          total_km_unpaved?: number
+          total_vias?: number
+        }
+        Relationships: []
+      }
       sync_logs: {
         Row: {
           attempt: number
