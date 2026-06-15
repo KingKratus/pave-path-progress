@@ -4,6 +4,7 @@ import { Search, MapPin, BarChart3, TrendingUp, Star, ArrowUpRight, Sparkles, Da
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
+import { BrasilStats } from "@/components/BrasilStats";
 import { useIbgeMunicipios, searchMunicipios } from "@/hooks/useIbgeMunicipios";
 
 const Index = () => {
@@ -180,6 +181,8 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      <BrasilStats />
 
       {/* HOW IT WORKS */}
       <section className="border-t border-border bg-muted/30 py-16">
