@@ -219,16 +219,20 @@ const MunicipioDetail = () => {
                 <TabsTrigger value="mapa">Mapa</TabsTrigger>
                 <TabsTrigger value="lista">Lista</TabsTrigger>
                 <TabsTrigger value="insights">Insights</TabsTrigger>
+                <TabsTrigger value="historico"><Clock className="mr-1 h-3 w-3" />Histórico OSM</TabsTrigger>
                 <TabsTrigger value="comparacao">Comparação</TabsTrigger>
                 <TabsTrigger value="ia"><Sparkles className="mr-1 h-3 w-3" />IA</TabsTrigger>
               </TabsList>
 
               <TabsContent value="mapa">
-                <Card className="overflow-hidden">
-                  <div className="h-[500px]">
-                    <LeafletMap roads={roads.map(r => ({ ...r, name: r.name || "" }))} cityName={cityName} boundaryGeoJson={boundary} focusOsmId={focusOsmId} bairro={bairroParam} uf={uf} />
-                  </div>
-                </Card>
+                <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                  <Card className="overflow-hidden">
+                    <div className="h-[500px]">
+                      <LeafletMap roads={filteredRoads.map(r => ({ ...r, name: r.name || "" }))} cityName={cityName} boundaryGeoJson={boundary} focusOsmId={focusOsmId} bairro={bairroParam} uf={uf} />
+                    </div>
+                  </Card>
+                  <BairroPanel roads={roads} activeBairro={bairroParam} onSelect={setBairro} />
+                </div>
                 {!boundary && (
                   <p className="mt-2 text-xs text-muted-foreground">
                     Limite municipal não disponível ainda — sincronize novamente para restringir o mapa à cidade.
@@ -301,6 +305,10 @@ const MunicipioDetail = () => {
 
               <TabsContent value="insights">
                 <MunicipioInsights municipioId={municipioId} />
+              </TabsContent>
+
+              <TabsContent value="historico">
+                <BairroHistory city={cityName} uf={uf} bairro={bairroParam} />
               </TabsContent>
 
               <TabsContent value="comparacao">
