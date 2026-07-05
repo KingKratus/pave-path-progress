@@ -14,10 +14,17 @@ serve(async (req) => {
   if (!rl.ok) return rateLimitResponse(rl, corsHeaders);
 
   try {
-    const url = new URL(req.url);
-    const q = (url.searchParams.get("q") || "").trim();
-    const city = url.searchParams.get("city") || undefined;
+    let q = ""; let city: string | undefined;
+    if (req.method === "POST") {
+      const b = await req.json().catch(() => ({}));
+      q = (b.q || "").trim(); city = b.city;
+    } else {
+      const url = new URL(req.url);
+      q = (url.searchParams.get("q") || "").trim();
+      city = url.searchParams.get("city") || undefined;
+    }
     if (!q || q.length < 2) return new Response(JSON.stringify({ results: [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
 
     const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
