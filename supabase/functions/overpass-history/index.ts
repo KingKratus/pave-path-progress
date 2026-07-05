@@ -1,5 +1,7 @@
-// Overpass attic query - histórico de pavimentação sob demanda. NUNCA cacheia.
+// Overpass attic query - histórico de pavimentação sob demanda. NUNCA cacheia no Supabase.
+// Cache externo (Nostr/IPFS) é feito via edge `history-cache`.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,17 +18,20 @@ function hav(a:[number,number], b:[number,number]) {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const rl = await checkRateLimit(req, "overpass-history", { perMinute: 10, perDay: 100 });
+  if (!rl.ok) return rateLimitResponse(rl, corsHeaders);
+
   try {
     const { city, uf, bairro, dates } = await req.json();
     if (!city || !Array.isArray(dates) || dates.length === 0) {
       return new Response(JSON.stringify({ error: "city e dates[] são obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const limited = dates.slice(0, 12); // até 12 pontos por chamada
+    const limited = dates.slice(0, 12);
 
     const areaQ = uf
       ? `area["name"="${city}"]["boundary"="administrative"]["is_in:state_code"~"${uf}"]->.a;`
       : `area["name"="${city}"]["boundary"="administrative"]->.a;`;
-
     const bairroFilter = bairro ? `["addr:suburb"~"${bairro}",i]` : "";
 
     const series: Array<{ date: string; total_km_unpaved: number; vias: number; error?: string }> = [];

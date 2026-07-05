@@ -38,3 +38,9 @@ verify_jwt = false
 
 [functions.refresh-stats]
 verify_jwt = true
+
+[functions.search-bairros]
+verify_jwt = false
+
+[functions.history-cache]
+verify_jwt = false
