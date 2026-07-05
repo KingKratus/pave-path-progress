@@ -31,25 +31,8 @@ export function GlobalSearchBar() {
     if (q.length < 2) { setBairros([]); return; }
     const t = setTimeout(async () => {
       try {
-        const { data } = await supabase.functions.invoke("search-bairros", {
-          method: "GET" as any,
-          body: null as any,
-          headers: {},
-        }).catch(() => ({ data: null }));
-        // fallback: chamar via fetch com query string, pois invoke não suporta GET+query bem
-        const base = (import.meta as any).env?.VITE_SUPABASE_URL;
-        const key = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY;
-        if (base && key) {
-          const r = await fetch(`${base}/functions/v1/search-bairros?q=${encodeURIComponent(q)}`, {
-            headers: { apikey: key, Authorization: `Bearer ${key}` },
-          });
-          if (r.ok) {
-            const j = await r.json();
-            setBairros((j?.results || []).slice(0, 6));
-          }
-        } else if (data?.results) {
-          setBairros(data.results.slice(0, 6));
-        }
+        const { data } = await supabase.functions.invoke("search-bairros", { body: { q } });
+        setBairros((data?.results || []).slice(0, 6));
       } catch { /* silencia */ }
     }, 250);
     return () => clearTimeout(t);
