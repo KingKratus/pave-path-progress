@@ -92,6 +92,60 @@ export type Database = {
         }
         Relationships: []
       }
+      edge_rate_limits: {
+        Row: {
+          count: number
+          key: string
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          key: string
+          updated_at?: string
+          window_start?: string
+        }
+        Update: {
+          count?: number
+          key?: string
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
+      external_cache_config: {
+        Row: {
+          enabled: boolean
+          extra_cities: string[]
+          id: string
+          ipfs_gateway: string
+          nostr_pubkey: string | null
+          nostr_relays: string[]
+          provider: Database["public"]["Enums"]["cache_provider"]
+          updated_at: string
+        }
+        Insert: {
+          enabled?: boolean
+          extra_cities?: string[]
+          id?: string
+          ipfs_gateway?: string
+          nostr_pubkey?: string | null
+          nostr_relays?: string[]
+          provider?: Database["public"]["Enums"]["cache_provider"]
+          updated_at?: string
+        }
+        Update: {
+          enabled?: boolean
+          extra_cities?: string[]
+          id?: string
+          ipfs_gateway?: string
+          nostr_pubkey?: string | null
+          nostr_relays?: string[]
+          provider?: Database["public"]["Enums"]["cache_provider"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       municipios: {
         Row: {
           created_at: string
@@ -171,6 +225,7 @@ export type Database = {
           atualizado_em: string
           key: string
           municipios_sincronizados: number
+          periodo: string
           scope: string
           total_km_paved: number
           total_km_unpaved: number
@@ -180,6 +235,7 @@ export type Database = {
           atualizado_em?: string
           key: string
           municipios_sincronizados?: number
+          periodo?: string
           scope: string
           total_km_paved?: number
           total_km_unpaved?: number
@@ -189,6 +245,7 @@ export type Database = {
           atualizado_em?: string
           key?: string
           municipios_sincronizados?: number
+          periodo?: string
           scope?: string
           total_km_paved?: number
           total_km_unpaved?: number
@@ -389,6 +446,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      cache_provider: "none" | "nostr" | "ipfs" | "both"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -517,6 +575,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      cache_provider: ["none", "nostr", "ipfs", "both"],
     },
   },
 } as const
