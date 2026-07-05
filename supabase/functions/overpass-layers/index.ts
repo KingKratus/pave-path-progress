@@ -1,5 +1,6 @@
-// Camadas extras Overpass sob demanda (pontes, escolas, saúde, transporte, qualidade)
+// Camadas extras Overpass sob demanda (pontes, escolas, saúde, transporte, qualidade, bairros)
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,10 +15,16 @@ const LAYERS: Record<string, (area: string) => string> = {
   transporte: (a) => `( node(area.${a})["highway"="bus_stop"]; node(area.${a})["public_transport"="platform"]; );`,
   qualidade: (a) => `( way(area.${a})["highway"]["smoothness"~"bad|very_bad|horrible|very_horrible|impassable"]; );`,
   iluminacao: (a) => `( way(area.${a})["highway"]["lit"="no"]; );`,
+  // Polígonos oficiais de bairros (admin_level=10 no Brasil).
+  bairros: (a) => `( relation(area.${a})["boundary"="administrative"]["admin_level"~"10|9"]; );`,
 };
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const rl = await checkRateLimit(req, "overpass-layers", { perMinute: 20, perDay: 200 });
+  if (!rl.ok) return rateLimitResponse(rl, corsHeaders);
+
   try {
     const { city, uf, layer } = await req.json();
     if (!city || !layer || !LAYERS[layer]) {
@@ -26,10 +33,11 @@ serve(async (req) => {
       });
     }
     const areaQ = `area["name"="${city}"]["boundary"="administrative"]->.a;`;
-    const q = `[out:json][timeout:60];
+    const out = layer === "bairros" ? "out geom tags;" : "out geom;";
+    const q = `[out:json][timeout:90];
 ${areaQ}
 ${LAYERS[layer]("a")}
-out geom;`;
+${out}`;
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -42,6 +50,7 @@ out geom;`;
       lat: el.lat ?? el.center?.lat ?? null,
       lon: el.lon ?? el.center?.lon ?? null,
       geometry: el.geometry || null,
+      members: el.members || null,
     }));
     return new Response(JSON.stringify({ city, uf, layer, count: items.length, items }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
