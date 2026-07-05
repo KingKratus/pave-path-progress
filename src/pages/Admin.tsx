@@ -15,10 +15,12 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, RefreshCw, Calculator, MapIcon, AlertCircle, CheckCircle2, RotateCcw, Eye } from "lucide-react";
+import { Loader2, RefreshCw, Calculator, MapIcon, AlertCircle, CheckCircle2, RotateCcw, Eye, Cloud } from "lucide-react";
 import { AiProvidersPanel } from "@/components/admin/AiProvidersPanel";
 import { AlertsPanel } from "@/components/admin/AlertsPanel";
+import { CachePanel } from "@/components/admin/CachePanel";
 import { toast } from "@/hooks/use-toast";
+
 
 const UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
 
@@ -207,11 +209,18 @@ const Admin = () => {
             <TabsTrigger value="logs">Histórico</TabsTrigger>
             <TabsTrigger value="ranking">Ranking</TabsTrigger>
             <TabsTrigger value="ia">IA Providers</TabsTrigger>
+            <TabsTrigger value="cache"><Cloud className="mr-1 h-3.5 w-3.5" />Cache externo</TabsTrigger>
           </TabsList>
 
           <TabsContent value="alertas">
             <AlertsPanel />
           </TabsContent>
+
+          <TabsContent value="cache">
+            <CachePanel />
+          </TabsContent>
+
+
 
 
           <TabsContent value="sync">
