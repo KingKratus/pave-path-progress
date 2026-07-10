@@ -12,6 +12,8 @@ interface Road {
   geojson: any;
 }
 
+interface BairroPoly { id: number; nome: string; geometry: any; }
+
 interface LeafletMapProps {
   roads: Road[];
   cityName: string;
@@ -20,6 +22,8 @@ interface LeafletMapProps {
   focusOsmId?: number | null;
   bairro?: string | null;
   uf?: string;
+  bairrosOverlay?: BairroPoly[];
+  onSelectBairro?: (nome: string) => void;
 }
 
 const SURFACE_COLORS: Record<string, string> = {
