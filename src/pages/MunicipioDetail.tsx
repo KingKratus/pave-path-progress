@@ -15,6 +15,7 @@ import { AiPriorities } from "@/components/AiPriorities";
 import { MunicipioInsights } from "@/components/MunicipioInsights";
 import { BairroPanel } from "@/components/BairroPanel";
 import { BairroHistory } from "@/components/BairroHistory";
+import { useBairrosOverlay, isAutoBairrosCity } from "@/hooks/useBairrosOverlay";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RoadData {
@@ -42,6 +43,8 @@ const MunicipioDetail = () => {
   const [boundary, setBoundary] = useState<any>(null);
   const [tab, setTab] = useState("mapa");
   const [focusOsmId, setFocusOsmId] = useState<number | null>(searchParams.get("focus") ? Number(searchParams.get("focus")) : null);
+  const [showBairrosOverlay, setShowBairrosOverlay] = useState(() => isAutoBairrosCity(cityName));
+  const { bairros: overlayBairros, loading: overlayLoading, error: overlayError } = useBairrosOverlay(cityName, uf, showBairrosOverlay);
   const selectRoad = (osmId: number) => { setFocusOsmId(osmId); setTab("mapa"); };
   // Filtros para lista
   const [filterSurface, setFilterSurface] = useState("all");
@@ -225,13 +228,44 @@ const MunicipioDetail = () => {
               </TabsList>
 
               <TabsContent value="mapa">
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={showBairrosOverlay ? "default" : "outline"}
+                    onClick={() => setShowBairrosOverlay((v) => !v)}
+                    className="gap-2"
+                  >
+                    <Layers className="h-4 w-4" />
+                    {showBairrosOverlay ? "Ocultar bairros (OSM)" : "Mostrar bairros (OSM)"}
+                  </Button>
+                  {overlayLoading && <span className="text-xs text-muted-foreground">Carregando polígonos de bairros…</span>}
+                  {overlayError && <span className="text-xs text-destructive">{overlayError}</span>}
+                  {!overlayLoading && showBairrosOverlay && overlayBairros.length > 0 && (
+                    <span className="text-xs text-muted-foreground">{overlayBairros.length} bairros oficiais</span>
+                  )}
+                </div>
                 <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
                   <Card className="overflow-hidden">
                     <div className="h-[500px]">
-                      <LeafletMap roads={filteredRoads.map(r => ({ ...r, name: r.name || "" }))} cityName={cityName} boundaryGeoJson={boundary} focusOsmId={focusOsmId} bairro={bairroParam} uf={uf} />
+                      <LeafletMap
+                        roads={filteredRoads.map(r => ({ ...r, name: r.name || "" }))}
+                        cityName={cityName}
+                        boundaryGeoJson={boundary}
+                        focusOsmId={focusOsmId}
+                        bairro={bairroParam}
+                        uf={uf}
+                        bairrosOverlay={showBairrosOverlay ? overlayBairros : []}
+                        onSelectBairro={(n) => setBairro(n)}
+                      />
                     </div>
                   </Card>
-                  <BairroPanel roads={roads} activeBairro={bairroParam} onSelect={setBairro} />
+                  <BairroPanel
+                    roads={roads}
+                    activeBairro={bairroParam}
+                    onSelect={setBairro}
+                    overlayBairros={showBairrosOverlay ? overlayBairros : []}
+                    overlayLoading={overlayLoading}
+                  />
                 </div>
                 {!boundary && (
                   <p className="mt-2 text-xs text-muted-foreground">

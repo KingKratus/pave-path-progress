@@ -12,6 +12,8 @@ interface Road {
   geojson: any;
 }
 
+interface BairroPoly { id: number; nome: string; geometry: any; }
+
 interface LeafletMapProps {
   roads: Road[];
   cityName: string;
@@ -20,6 +22,8 @@ interface LeafletMapProps {
   focusOsmId?: number | null;
   bairro?: string | null;
   uf?: string;
+  bairrosOverlay?: BairroPoly[];
+  onSelectBairro?: (nome: string) => void;
 }
 
 const SURFACE_COLORS: Record<string, string> = {
@@ -56,7 +60,7 @@ async function fetchBairroPolygon(bairro: string, city: string, uf?: string): Pr
   }
 }
 
-export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, focusOsmId, bairro, uf }: LeafletMapProps) => {
+export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, focusOsmId, bairro, uf, bairrosOverlay, onSelectBairro }: LeafletMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const [style, setStyle] = useState<string>(() => localStorage.getItem("mapStyle") || "osm");
@@ -115,6 +119,36 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
       } catch (e) { console.warn("bairro render failed", e); }
     }
 
+    if (bairrosOverlay && bairrosOverlay.length > 0) {
+      try {
+        const fc = {
+          type: "FeatureCollection" as const,
+          features: bairrosOverlay
+            .filter((b) => b.geometry)
+            .map((b) => ({ type: "Feature" as const, properties: { nome: b.nome, id: b.id }, geometry: b.geometry })),
+        };
+        L.geoJSON(fc as any, {
+          style: (f) => {
+            const isActive = bairro && f?.properties?.nome === bairro;
+            return {
+              color: isActive ? "hsl(47 92% 53%)" : "hsl(158 64% 32%)",
+              weight: isActive ? 3 : 1.5,
+              fillColor: isActive ? "hsl(47 92% 53%)" : "hsl(158 64% 32%)",
+              fillOpacity: isActive ? 0.18 : 0.06,
+              dashArray: isActive ? undefined : "2 4",
+            };
+          },
+          onEachFeature: (f, l) => {
+            const nome = f.properties?.nome || "Bairro";
+            l.bindTooltip(nome, { sticky: true, direction: "top", className: "bairro-label" });
+            l.on("click", () => onSelectBairro?.(nome));
+          },
+        }).addTo(map);
+      } catch (e) { console.warn("bairros overlay failed", e); }
+    }
+
+
+
     const features = roads.filter((r) => r.geojson).map((r) => ({
       type: "Feature" as const,
       properties: { id: r.id, osm_id: r.osm_id, name: r.name, surface: r.surface, length_m: r.length_m },
@@ -156,7 +190,7 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
     }
 
     return () => { map.remove(); mapInstance.current = null; };
-  }, [roads, cityName, boundaryGeoJson, style, highlightOsmIds, focusOsmId, bairroGeo, bairro]);
+  }, [roads, cityName, boundaryGeoJson, style, highlightOsmIds, focusOsmId, bairroGeo, bairro, bairrosOverlay, onSelectBairro]);
 
   const changeStyle = (s: string) => { setStyle(s); localStorage.setItem("mapStyle", s); };
 
