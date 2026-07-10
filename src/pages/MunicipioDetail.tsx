@@ -15,6 +15,7 @@ import { AiPriorities } from "@/components/AiPriorities";
 import { MunicipioInsights } from "@/components/MunicipioInsights";
 import { BairroPanel } from "@/components/BairroPanel";
 import { BairroHistory } from "@/components/BairroHistory";
+import { useBairrosOverlay, isAutoBairrosCity } from "@/hooks/useBairrosOverlay";
 import { supabase } from "@/integrations/supabase/client";
 
 interface RoadData {
