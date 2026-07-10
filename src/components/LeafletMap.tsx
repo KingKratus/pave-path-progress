@@ -190,7 +190,7 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
     }
 
     return () => { map.remove(); mapInstance.current = null; };
-  }, [roads, cityName, boundaryGeoJson, style, highlightOsmIds, focusOsmId, bairroGeo, bairro]);
+  }, [roads, cityName, boundaryGeoJson, style, highlightOsmIds, focusOsmId, bairroGeo, bairro, bairrosOverlay, onSelectBairro]);
 
   const changeStyle = (s: string) => { setStyle(s); localStorage.setItem("mapStyle", s); };
 
