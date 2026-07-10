@@ -99,22 +99,6 @@ const Admin = () => {
     return () => { supabase.removeChannel(ch); clearInterval(itv); };
   }, [batchOpen, batchId]);
 
-  if (loading) return <div className="flex items-center justify-center p-16"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="container mx-auto px-4 py-16 text-center">
-          <h1 className="text-2xl font-bold">Acesso restrito</h1>
-          <p className="mt-2 text-muted-foreground">Sua conta ({session?.user.email}) não tem privilégios de administrador.</p>
-          <p className="mt-2 text-xs font-mono text-muted-foreground">{session?.user.id}</p>
-          <Button className="mt-4" onClick={() => supabase.auth.signOut().then(() => navigate("/"))}>Sair</Button>
-        </div>
-      </div>
-    );
-  }
-
   const saveSettings = async () => {
     if (!settings) return;
     const { error } = await supabase.from("admin_settings").update({
@@ -190,6 +174,22 @@ const Admin = () => {
     ? <Badge variant="default" className="gap-1"><CheckCircle2 className="h-3 w-3" />OK</Badge>
     : s === "error" ? <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" />Erro</Badge>
     : <Badge variant="secondary" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" />Rodando</Badge>;
+
+  if (loading) return <div className="flex items-center justify-center p-16"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h1 className="text-2xl font-bold">Acesso restrito</h1>
+          <p className="mt-2 text-muted-foreground">Sua conta ({session?.user.email}) não tem privilégios de administrador.</p>
+          <p className="mt-2 text-xs font-mono text-muted-foreground">{session?.user.id}</p>
+          <Button className="mt-4" onClick={() => supabase.auth.signOut().then(() => navigate("/"))}>Sair</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
