@@ -119,6 +119,36 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
       } catch (e) { console.warn("bairro render failed", e); }
     }
 
+    if (bairrosOverlay && bairrosOverlay.length > 0) {
+      try {
+        const fc = {
+          type: "FeatureCollection" as const,
+          features: bairrosOverlay
+            .filter((b) => b.geometry)
+            .map((b) => ({ type: "Feature" as const, properties: { nome: b.nome, id: b.id }, geometry: b.geometry })),
+        };
+        L.geoJSON(fc as any, {
+          style: (f) => {
+            const isActive = bairro && f?.properties?.nome === bairro;
+            return {
+              color: isActive ? "hsl(47 92% 53%)" : "hsl(158 64% 32%)",
+              weight: isActive ? 3 : 1.5,
+              fillColor: isActive ? "hsl(47 92% 53%)" : "hsl(158 64% 32%)",
+              fillOpacity: isActive ? 0.18 : 0.06,
+              dashArray: isActive ? undefined : "2 4",
+            };
+          },
+          onEachFeature: (f, l) => {
+            const nome = f.properties?.nome || "Bairro";
+            l.bindTooltip(nome, { sticky: true, direction: "top", className: "bairro-label" });
+            l.on("click", () => onSelectBairro?.(nome));
+          },
+        }).addTo(map);
+      } catch (e) { console.warn("bairros overlay failed", e); }
+    }
+
+
+
     const features = roads.filter((r) => r.geojson).map((r) => ({
       type: "Feature" as const,
       properties: { id: r.id, osm_id: r.osm_id, name: r.name, surface: r.surface, length_m: r.length_m },
