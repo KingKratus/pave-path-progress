@@ -43,6 +43,8 @@ const MunicipioDetail = () => {
   const [boundary, setBoundary] = useState<any>(null);
   const [tab, setTab] = useState("mapa");
   const [focusOsmId, setFocusOsmId] = useState<number | null>(searchParams.get("focus") ? Number(searchParams.get("focus")) : null);
+  const [showBairrosOverlay, setShowBairrosOverlay] = useState(() => isAutoBairrosCity(cityName));
+  const { bairros: overlayBairros, loading: overlayLoading, error: overlayError } = useBairrosOverlay(cityName, uf, showBairrosOverlay);
   const selectRoad = (osmId: number) => { setFocusOsmId(osmId); setTab("mapa"); };
   // Filtros para lista
   const [filterSurface, setFilterSurface] = useState("all");
