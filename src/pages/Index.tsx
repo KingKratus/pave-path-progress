@@ -1,14 +1,18 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, MapPin, BarChart3, TrendingUp, Star, ArrowUpRight, Sparkles, Database, Activity } from "lucide-react";
+import { Search, MapPin, BarChart3, TrendingUp, Star, ArrowUpRight, Sparkles, Database, Activity, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Navbar } from "@/components/Navbar";
 import { BrasilStats } from "@/components/BrasilStats";
 import { useIbgeMunicipios, searchMunicipios } from "@/hooks/useIbgeMunicipios";
+import { supabase } from "@/integrations/supabase/client";
+
+type BairroHit = { source: string; bairro: string; municipio: string; uf?: string };
 
 const Index = () => {
   const [search, setSearch] = useState("");
+  const [bairros, setBairros] = useState<BairroHit[]>([]);
   const navigate = useNavigate();
   const { data: ibge } = useIbgeMunicipios();
 
@@ -17,10 +21,28 @@ const Index = () => {
     [ibge, search]
   );
 
+  useEffect(() => {
+    if (search.trim().length < 2) { setBairros([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await supabase.functions.invoke("search-bairros", { body: { q: search.trim() } });
+        setBairros((data?.results || []).slice(0, 5));
+      } catch { /* silencia */ }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const goTo = (nome: string, uf?: string) => {
     const n = (nome || "").trim();
     if (!n) return;
     navigate(`/municipio/${encodeURIComponent(n)}${uf ? `?uf=${uf}` : ""}`);
+  };
+
+  const goBairro = (b: BairroHit) => {
+    const qs = new URLSearchParams();
+    if (b.uf) qs.set("uf", b.uf);
+    qs.set("bairro", b.bairro);
+    navigate(`/municipio/${encodeURIComponent(b.municipio)}?${qs.toString()}`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -28,6 +50,7 @@ const Index = () => {
     if (suggestions[0]) goTo(suggestions[0].nome, suggestions[0].uf);
     else if (search.trim()) goTo(search.trim());
   };
+
 
   return (
     <div className="min-h-screen bg-background">
