@@ -44,6 +44,10 @@ export const Navbar = () => {
           })}
         </div>
       </div>
+      {/* Busca global visível em mobile (bairros + cidades) */}
+      <div className="border-t border-border/40 bg-background/60 px-4 py-2 md:hidden">
+        <GlobalSearchBar />
+      </div>
     </nav>
   );
 };
