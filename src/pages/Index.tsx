@@ -93,8 +93,11 @@ const Index = () => {
                 </div>
               </div>
 
-              {suggestions.length > 0 && (
+              {(suggestions.length > 0 || bairros.length > 0) && (
                 <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+                  {suggestions.length > 0 && (
+                    <div className="border-b border-border/60 bg-muted/40 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Municípios</div>
+                  )}
                   {suggestions.map((m) => (
                     <button
                       key={m.id}
@@ -107,6 +110,25 @@ const Index = () => {
                       </div>
                       <span className="font-medium text-foreground">{m.nome}</span>
                       {m.uf && <span className="ml-auto rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{m.uf}</span>}
+                    </button>
+                  ))}
+                  {bairros.length > 0 && (
+                    <div className="border-b border-border/60 bg-muted/40 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Bairros</div>
+                  )}
+                  {bairros.map((b, i) => (
+                    <button
+                      key={`${b.bairro}-${b.municipio}-${i}`}
+                      type="button"
+                      onClick={() => goBairro(b)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted"
+                    >
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary/20">
+                        <Building2 className="h-4 w-4 text-accent-foreground" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-foreground">{b.bairro}</p>
+                        <p className="truncate text-xs text-muted-foreground">{b.municipio}{b.uf ? ` · ${b.uf}` : ""}</p>
+                      </div>
                     </button>
                   ))}
                 </div>
