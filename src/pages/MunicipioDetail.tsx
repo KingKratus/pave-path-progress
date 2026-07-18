@@ -1,6 +1,6 @@
 import { useParams, useSearchParams } from "react-router-dom";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { MapPin, Route, Download, Loader2, AlertTriangle, Clock, Sparkles, Layers } from "lucide-react";
+import { MapPin, Route, Download, Loader2, AlertTriangle, Clock, Sparkles, Layers, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
