@@ -248,22 +248,62 @@ const MunicipioDetail = () => {
               </TabsList>
 
               <TabsContent value="mapa">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant={showBairrosOverlay ? "default" : "outline"}
-                    onClick={() => setShowBairrosOverlay((v) => !v)}
-                    className="gap-2"
-                  >
-                    <Layers className="h-4 w-4" />
-                    {showBairrosOverlay ? "Ocultar bairros (OSM)" : "Mostrar bairros (OSM)"}
-                  </Button>
-                  {overlayLoading && <span className="text-xs text-muted-foreground">Carregando polígonos de bairros…</span>}
-                  {overlayError && <span className="text-xs text-destructive">{overlayError}</span>}
-                  {!overlayLoading && showBairrosOverlay && overlayBairros.length > 0 && (
-                    <span className="text-xs text-muted-foreground">{overlayBairros.length} bairros oficiais</span>
+                <Card className="mb-3 border-border/60">
+                  <CardContent className="flex flex-col gap-3 p-3 md:flex-row md:items-center">
+                    <div className="relative flex-1">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={bairroQuery}
+                        onChange={(e) => setBairroQuery(e.target.value)}
+                        placeholder={showBairrosOverlay ? `Buscar bairro em ${cityName}...` : "Ative bairros (OSM) para buscar"}
+                        className="pl-9"
+                        disabled={!showBairrosOverlay}
+                      />
+                      {bairroSuggestions.length > 0 && (
+                        <div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover shadow-lg">
+                          {bairroSuggestions.map((b) => (
+                            <button
+                              key={b.id}
+                              onClick={() => { setBairro(b.nome); setBairroQuery(""); }}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                            >
+                              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                              {b.nome}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant={showBairrosOverlay ? "default" : "outline"}
+                        onClick={() => setShowBairrosOverlay((v) => !v)}
+                        className="gap-2"
+                      >
+                        <Layers className="h-4 w-4" />
+                        {showBairrosOverlay ? "Ocultar bairros" : "Mostrar bairros"}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={refreshBairros} disabled={!showBairrosOverlay || overlayLoading} className="gap-2">
+                        {overlayLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />}
+                        Sincronizar
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={downloadBairrosGeoJSON} disabled={!overlayBairros.length} className="gap-2">
+                        <Download className="h-4 w-4" />
+                        Baixar bairros
+                      </Button>
+                    </div>
+                  </CardContent>
+                  {(overlayLoading || overlayError || (showBairrosOverlay && overlayBairros.length > 0)) && (
+                    <div className="border-t border-border/60 px-3 py-1.5 text-xs">
+                      {overlayLoading && <span className="text-muted-foreground">Carregando polígonos de bairros do OSM…</span>}
+                      {overlayError && <span className="text-destructive">Erro: {overlayError}</span>}
+                      {!overlayLoading && !overlayError && overlayBairros.length > 0 && (
+                        <span className="text-muted-foreground">{overlayBairros.length} bairros oficiais carregados via Overpass</span>
+                      )}
+                    </div>
                   )}
-                </div>
+                </Card>
                 <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
                   <Card className="overflow-hidden">
                     <div className="h-[500px]">
