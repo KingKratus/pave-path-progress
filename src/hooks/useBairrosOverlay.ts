@@ -31,6 +31,7 @@ export function useBairrosOverlay(city: string | undefined, uf: string | undefin
   const [bairros, setBairros] = useState<BairroFeature[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     if (!city || !enabled) { setBairros([]); return; }
@@ -58,7 +59,8 @@ export function useBairrosOverlay(city: string | undefined, uf: string | undefin
       }
     })();
     return () => { cancelled = true; };
-  }, [city, uf, enabled]);
+  }, [city, uf, enabled, reloadTick]);
 
-  return { bairros, loading, error };
+  const refresh = () => setReloadTick((n) => n + 1);
+  return { bairros, loading, error, refresh };
 }

@@ -131,16 +131,20 @@ export const LeafletMap = ({ roads, cityName, boundaryGeoJson, highlightOsmIds, 
           style: (f) => {
             const isActive = bairro && f?.properties?.nome === bairro;
             return {
-              color: isActive ? "hsl(47 92% 53%)" : "hsl(158 64% 32%)",
-              weight: isActive ? 3 : 1.5,
-              fillColor: isActive ? "hsl(47 92% 53%)" : "hsl(158 64% 32%)",
-              fillOpacity: isActive ? 0.18 : 0.06,
-              dashArray: isActive ? undefined : "2 4",
+              color: isActive ? "hsl(47 92% 45%)" : "hsl(14 91% 55%)",
+              weight: isActive ? 4 : 2,
+              fillColor: isActive ? "hsl(47 92% 53%)" : "hsl(14 91% 55%)",
+              fillOpacity: isActive ? 0.22 : 0.08,
             };
           },
           onEachFeature: (f, l) => {
             const nome = f.properties?.nome || "Bairro";
             l.bindTooltip(nome, { sticky: true, direction: "top", className: "bairro-label" });
+            l.on("mouseover", () => (l as any).setStyle({ weight: 4, fillOpacity: 0.2 }));
+            l.on("mouseout", () => {
+              const isActive = bairro && nome === bairro;
+              (l as any).setStyle({ weight: isActive ? 4 : 2, fillOpacity: isActive ? 0.22 : 0.08 });
+            });
             l.on("click", () => onSelectBairro?.(nome));
           },
         }).addTo(map);
