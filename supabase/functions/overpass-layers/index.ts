@@ -40,7 +40,11 @@ ${LAYERS[layer]("a")}
 ${out}`;
     const res = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+        "User-Agent": "RankingPavimentacao/1.0 (contato@ranking-pavimentacao.app)",
+      },
       body: `data=${encodeURIComponent(q)}`,
     });
     if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`);
