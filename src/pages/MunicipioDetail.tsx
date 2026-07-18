@@ -44,7 +44,27 @@ const MunicipioDetail = () => {
   const [tab, setTab] = useState("mapa");
   const [focusOsmId, setFocusOsmId] = useState<number | null>(searchParams.get("focus") ? Number(searchParams.get("focus")) : null);
   const [showBairrosOverlay, setShowBairrosOverlay] = useState(() => isAutoBairrosCity(cityName));
-  const { bairros: overlayBairros, loading: overlayLoading, error: overlayError } = useBairrosOverlay(cityName, uf, showBairrosOverlay);
+  const { bairros: overlayBairros, loading: overlayLoading, error: overlayError, refresh: refreshBairros } = useBairrosOverlay(cityName, uf, showBairrosOverlay);
+  const [bairroQuery, setBairroQuery] = useState("");
+  const bairroSuggestions = useMemo(() => {
+    const q = bairroQuery.trim().toLowerCase();
+    if (!q) return [];
+    return overlayBairros.filter((b) => b.nome.toLowerCase().includes(q)).slice(0, 8);
+  }, [bairroQuery, overlayBairros]);
+  const downloadBairrosGeoJSON = () => {
+    if (!overlayBairros.length) return;
+    const fc = {
+      type: "FeatureCollection",
+      features: overlayBairros.filter((b) => b.geometry).map((b) => ({
+        type: "Feature", properties: { nome: b.nome, id: b.id, cidade: cityName, uf }, geometry: b.geometry,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(fc, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${cityName}_bairros.geojson`;
+    a.click();
+  };
   const selectRoad = (osmId: number) => { setFocusOsmId(osmId); setTab("mapa"); };
   // Filtros para lista
   const [filterSurface, setFilterSurface] = useState("all");
