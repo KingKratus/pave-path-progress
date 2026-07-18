@@ -34,20 +34,38 @@ serve(async (req) => {
     }
     const areaQ = `area["name"="${city}"]["boundary"="administrative"]->.a;`;
     const out = layer === "bairros" ? "out geom tags;" : "out geom;";
-    const q = `[out:json][timeout:90];
+    const q = `[out:json][timeout:60];
 ${areaQ}
 ${LAYERS[layer]("a")}
 ${out}`;
-    const res = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json",
-        "User-Agent": "RankingPavimentacao/1.0 (contato@ranking-pavimentacao.app)",
-      },
-      body: `data=${encodeURIComponent(q)}`,
-    });
-    if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`);
+    const ENDPOINTS = [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
+      "https://overpass.private.coffee/api/interpreter",
+    ];
+    let res: Response | null = null;
+    let lastErr = "";
+    for (const url of ENDPOINTS) {
+      try {
+        const r = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+            "User-Agent": "RankingPavimentacao/1.0 (contato@ranking-pavimentacao.app)",
+          },
+          body: `data=${encodeURIComponent(q)}`,
+        });
+        if (r.ok) { res = r; break; }
+        lastErr = `HTTP ${r.status} @ ${new URL(url).host}`;
+        // Retry on 429/500/502/503/504
+        if (![429, 500, 502, 503, 504].includes(r.status)) { res = r; break; }
+      } catch (e: any) {
+        lastErr = `${e?.message || e} @ ${url}`;
+      }
+    }
+    if (!res || !res.ok) throw new Error(`Overpass indisponível (${lastErr}). Tente novamente em alguns segundos.`);
+
     const data = await res.json();
     const items = (data.elements || []).map((el: any) => ({
       id: el.id, type: el.type, tags: el.tags || {},
